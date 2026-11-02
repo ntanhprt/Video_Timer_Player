@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/alarm.dart';
 import '../core/schedule.dart';
+import '../alarm/alarm_scheduler.dart';
 import '../data/alarm_repository.dart';
 import 'alarm_edit_page.dart';
 
@@ -20,10 +21,16 @@ String describeNext(DateTime? next, DateTime now) {
 
 class AlarmListPage extends StatelessWidget {
   final AlarmRepository repo;
-  const AlarmListPage({super.key, required this.repo});
+  final AlarmScheduler scheduler;
+  const AlarmListPage({super.key, required this.repo, required this.scheduler});
 
-  void _open(BuildContext context, [Alarm? a]) =>
-      Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => AlarmEditPage(repo: repo, initial: a)));
+  void _open(BuildContext context, [Alarm? a]) => Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => AlarmEditPage(repo: repo, initial: a, onTest: (alarm) => scheduler.testIn(alarm, const Duration(seconds: 10)))));
+
+  String _music(Alarm a, Set<String> ready) {
+    if (a.youtubeUrl.trim().isEmpty) return 'nhạc dự phòng';
+    return ready.contains(a.youtubeUrl) ? 'nhạc YouTube: đã tải' : 'nhạc YouTube: đang tải/chưa tải (tạm dùng nhạc dự phòng)';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +48,9 @@ class AlarmListPage extends StatelessWidget {
           if (alarms == null) return const Center(child: CircularProgressIndicator());
           if (alarms.isEmpty) return const Center(child: Text('Chưa có báo thức. Bấm "Thêm" để tạo.'));
           final now = DateTime.now();
-          return ListView.separated(
+          return ValueListenableBuilder<Set<String>>(
+            valueListenable: scheduler.ready,
+            builder: (context, ready, _) => ListView.separated(
             padding: const EdgeInsets.only(bottom: 88),
             itemCount: alarms.length,
             separatorBuilder: (_, _) => const Divider(height: 1),
@@ -50,11 +59,13 @@ class AlarmListPage extends StatelessWidget {
               final next = a.enabled ? nextFire(a.schedule, now) : null;
               return ListTile(
                 title: Text(a.name),
-                subtitle: Text('${a.enabled ? describeNext(next, now) : 'Đang tắt'} · ${outputLabel(a.output)}'),
+                subtitle: Text('${a.enabled ? describeNext(next, now) : 'Đang tắt'} · ${outputLabel(a.output)}\n${_music(a, ready)}'),
+                isThreeLine: true,
                 trailing: Switch(value: a.enabled, onChanged: (on) => repo.upsert(a.copyWith(enabled: on))),
                 onTap: () => _open(context, a),
               );
             },
+            ),
           );
         },
       ),

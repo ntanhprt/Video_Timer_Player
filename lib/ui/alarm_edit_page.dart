@@ -26,7 +26,10 @@ String _newId() => '${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}${
 class AlarmEditPage extends StatefulWidget {
   final AlarmRepository repo;
   final Alarm? initial;
-  const AlarmEditPage({super.key, required this.repo, this.initial});
+
+  /// Rings the alarm shortly so it can be tried now; returns a message for the user.
+  final Future<String> Function(Alarm alarm)? onTest;
+  const AlarmEditPage({super.key, required this.repo, this.initial, this.onTest});
 
   @override
   State<AlarmEditPage> createState() => _AlarmEditPageState();
@@ -81,6 +84,18 @@ class _AlarmEditPageState extends State<AlarmEditPage> {
     if (errors.isNotEmpty) return;
     await widget.repo.upsert(alarm);
     if (mounted) Navigator.of(context).maybePop();
+  }
+
+  Future<void> _test() async {
+    final alarm = _build();
+    final errors = validate(alarm);
+    setState(() => _errors = errors);
+    if (errors.isNotEmpty) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(const SnackBar(content: Text('Đang chuẩn bị... (tải nhạc có thể mất vài chục giây)')));
+    final msg = await widget.onTest!(alarm);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(SnackBar(content: Text('$msg Khóa màn hình để thử.'), duration: const Duration(seconds: 8)));
   }
 
   Future<void> _delete() async {
@@ -190,6 +205,14 @@ class _AlarmEditPageState extends State<AlarmEditPage> {
             items: [for (final o in OutputKind.values) DropdownMenuItem(value: o, child: Text(outputLabel(o)))],
             onChanged: (o) => setState(() => _output = o ?? _output),
           ),
+          if (widget.onTest != null) ...[
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: _test,
+              icon: const Icon(Icons.play_arrow),
+              label: const Text('Thử ngay (kêu sau 10 giây)'),
+            ),
+          ],
         ],
       ),
     );
