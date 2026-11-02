@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
@@ -35,7 +36,13 @@ class YoutubeCache {
     String? lastError;
     try {
       final id = VideoId(url.trim());
-      for (final client in [YoutubeApiClient.androidSdkless, YoutubeApiClient.androidVr, YoutubeApiClient.tv]) {
+      final clients = {
+        'androidSdkless': YoutubeApiClient.androidSdkless,
+        'androidVr': YoutubeApiClient.androidVr,
+        'tv': YoutubeApiClient.tv,
+      };
+      for (final entry in clients.entries) {
+        final client = entry.value;
         try {
           final manifest = await yt.videos.streams.getManifest(id, ytClients: [client]);
           final audio = manifest.audioOnly;
@@ -52,11 +59,13 @@ class YoutubeCache {
           await tmp.rename(target.path);
           return null;
         } catch (e) {
-          lastError = e.toString();
+          lastError = '${entry.key}: $e';
+          debugPrint('YT download failed [$lastError]');
         }
       }
       return lastError ?? 'không rõ lỗi';
     } catch (e) {
+      debugPrint('YT bad link: $e');
       return 'liên kết không đọc được: $e';
     } finally {
       yt.close();

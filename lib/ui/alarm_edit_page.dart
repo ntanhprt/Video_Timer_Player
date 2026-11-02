@@ -95,7 +95,15 @@ class _AlarmEditPageState extends State<AlarmEditPage> {
     messenger.showSnackBar(const SnackBar(content: Text('Đang chuẩn bị... (tải nhạc có thể mất vài chục giây)')));
     final msg = await widget.onTest!(alarm);
     messenger.hideCurrentSnackBar();
-    messenger.showSnackBar(SnackBar(content: Text('$msg Khóa màn hình để thử.'), duration: const Duration(seconds: 8)));
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Thử báo thức'),
+        content: SingleChildScrollView(child: SelectableText('$msg\n\nKhóa màn hình để thử.')),
+        actions: [TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Đóng'))],
+      ),
+    );
   }
 
   Future<void> _delete() async {
