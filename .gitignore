@@ -1,0 +1,19 @@
+# Flutter / Dart
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+*.iml
+.idea/
+# Android signing (never commit)
+*.jks
+*.keystore
+android/key.properties
+# Web server local secrets / data
+web/config.local.php
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+# scratch
+build_out/
