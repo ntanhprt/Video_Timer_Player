@@ -8,6 +8,7 @@ import 'alarm/alarm_scheduler.dart';
 import 'alarm/youtube_cache.dart';
 import 'data/alarm_repository.dart';
 import 'ui/alarm_list_page.dart';
+import 'ui/ringing_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -49,6 +50,7 @@ class App extends StatelessWidget {
       title: 'Đánh thức',
       theme: ThemeData(colorSchemeSeed: Colors.deepOrange, useMaterial3: true),
       darkTheme: ThemeData(colorSchemeSeed: Colors.deepOrange, useMaterial3: true, brightness: Brightness.dark),
+      builder: (context, child) => RingingOverlay(child: child!),
       home: AlarmListPage(repo: repo, scheduler: scheduler),
     );
   }
