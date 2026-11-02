@@ -7,14 +7,20 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    if: ${{ hashFiles('pubspec.yaml') != '' }}
     steps:
       - uses: actions/checkout@v4
+      - name: Skip until project exists
+        id: chk
+        run: |
+          if [ -f pubspec.yaml ]; then echo "ok=true" >> "$GITHUB_OUTPUT"; else echo "ok=false" >> "$GITHUB_OUTPUT"; echo "No pubspec.yaml yet, skipping"; fi
       - uses: actions/setup-java@v4
+        if: steps.chk.outputs.ok == 'true'
         with: { distribution: temurin, java-version: 17 }
       - uses: subosito/flutter-action@v2
+        if: steps.chk.outputs.ok == 'true'
         with: { channel: stable, cache: true }
       - name: Restore signing key
+        if: steps.chk.outputs.ok == 'true'
         env:
           KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
           KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -25,11 +31,16 @@ jobs:
             echo "$KS_B64" | base64 -d > android/app/upload.jks
             printf 'storePassword=%s\nkeyPassword=%s\nkeyAlias=%s\nstoreFile=upload.jks\n' "$KS_PASS" "$KEY_PASS" "$KEY_ALIAS" > android/key.properties
           fi
-      - run: flutter pub get
-      - run: flutter analyze
-      - run: flutter test
-      - run: flutter build apk --release
+      - if: steps.chk.outputs.ok == 'true'
+        run: flutter pub get
+      - if: steps.chk.outputs.ok == 'true'
+        run: flutter analyze
+      - if: steps.chk.outputs.ok == 'true'
+        run: flutter test
+      - if: steps.chk.outputs.ok == 'true'
+        run: flutter build apk --release
       - uses: actions/upload-artifact@v4
+        if: steps.chk.outputs.ok == 'true'
         with:
           name: app-release
           path: build/app/outputs/flutter-apk/app-release.apk
