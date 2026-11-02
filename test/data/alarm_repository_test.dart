@@ -9,7 +9,7 @@ Alarm _alarm(String id) => Alarm(
       id: id,
       name: 'Dậy',
       schedule: const Weekly(TimeOfDayMin(6, 30), {1, 2, 3}),
-      youtubeUrl: '',
+      youtubeUrls: const [],
       volume: const VolumeSpec(),
       output: OutputKind.speaker,
       enabled: true,

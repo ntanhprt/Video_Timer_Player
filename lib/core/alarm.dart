@@ -8,8 +8,8 @@ class Alarm {
   final String name;
   final ScheduleSpec schedule;
 
-  /// Empty means "no YouTube track": the fallback chain plays instead.
-  final String youtubeUrl;
+  /// One track is picked at random for each ring. Empty means "no YouTube track": the fallback plays.
+  final List<String> youtubeUrls;
   final VolumeSpec volume;
   final OutputKind output;
   final String? fallbackPath;
@@ -26,7 +26,7 @@ class Alarm {
     required this.id,
     required this.name,
     required this.schedule,
-    required this.youtubeUrl,
+    required this.youtubeUrls,
     required this.volume,
     required this.output,
     this.fallbackPath,
@@ -39,7 +39,7 @@ class Alarm {
   Alarm copyWith({
     String? name,
     ScheduleSpec? schedule,
-    String? youtubeUrl,
+    List<String>? youtubeUrls,
     VolumeSpec? volume,
     OutputKind? output,
     String? fallbackPath,
@@ -52,7 +52,7 @@ class Alarm {
         id: id,
         name: name ?? this.name,
         schedule: schedule ?? this.schedule,
-        youtubeUrl: youtubeUrl ?? this.youtubeUrl,
+        youtubeUrls: youtubeUrls ?? this.youtubeUrls,
         volume: volume ?? this.volume,
         output: output ?? this.output,
         fallbackPath: fallbackPath ?? this.fallbackPath,
@@ -66,7 +66,7 @@ class Alarm {
         'id': id,
         'name': name,
         'schedule': schedule.toJson(),
-        'youtubeUrl': youtubeUrl,
+        'youtubeUrls': youtubeUrls,
         'volume': volume.toJson(),
         'output': output.name,
         'fallbackPath': fallbackPath,
@@ -80,7 +80,9 @@ class Alarm {
         id: j['id'] as String,
         name: j['name'] as String,
         schedule: ScheduleSpec.fromJson(j['schedule'] as Map<String, dynamic>),
-        youtubeUrl: j['youtubeUrl'] as String,
+        youtubeUrls: [
+          for (final u in (j['youtubeUrls'] as List?) ?? [if (j['youtubeUrl'] != null) j['youtubeUrl']]) u as String,
+        ],
         volume: VolumeSpec.fromJson(j['volume'] as Map<String, dynamic>),
         output: OutputKind.values.byName(j['output'] as String),
         fallbackPath: j['fallbackPath'] as String?,

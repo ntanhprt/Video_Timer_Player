@@ -15,7 +15,7 @@ Alarm make({
       id: 'a1',
       name: 'Sáng',
       schedule: schedule ?? Weekly(const TimeOfDayMin(6, 30), {1, 2, 3, 4, 5, 6, 7}),
-      youtubeUrl: url,
+      youtubeUrls: url.isEmpty ? const [] : [url],
       volume: volume,
       output: OutputKind.anyConnected,
       enabled: true,

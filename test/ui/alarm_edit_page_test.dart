@@ -22,7 +22,7 @@ Alarm _alarm({VolumeSpec volume = const VolumeSpec()}) => Alarm(
       id: 'a',
       name: 'Dậy',
       schedule: const Weekly(TimeOfDayMin(6, 30), {1}),
-      youtubeUrl: '',
+      youtubeUrls: const [],
       volume: volume,
       output: OutputKind.speaker,
       enabled: true,
@@ -50,7 +50,7 @@ void main() {
     await t.enterText(find.byKey(const Key('youtubeUrl')), 'https://youtu.be/dQw4w9WgXcQ');
     await t.tap(find.text('Lưu'));
     await t.pump();
-    expect(repo.saved.single.youtubeUrl, 'https://youtu.be/dQw4w9WgXcQ');
+    expect(repo.saved.single.youtubeUrls, ['https://youtu.be/dQw4w9WgXcQ']);
   });
 
   testWidgets('a non-YouTube link is rejected', (t) async {
@@ -60,5 +60,44 @@ void main() {
     await t.pump();
     expect(find.textContaining('địa chỉ YouTube'), findsOneWidget);
     expect(repo.saved, isEmpty);
+  });
+
+  testWidgets('several pasted links are saved as a list, blanks and repeats dropped', (t) async {
+    final repo = await _pump(t, _alarm());
+    await t.enterText(
+      find.byKey(const Key('youtubeUrl')),
+      'https://youtu.be/aaaaaaaaaaa\n\n https://youtu.be/bbbbbbbbbbb,https://youtu.be/aaaaaaaaaaa',
+    );
+    await t.tap(find.text('Lưu'));
+    await t.pump();
+    expect(repo.saved.single.youtubeUrls, ['https://youtu.be/aaaaaaaaaaa', 'https://youtu.be/bbbbbbbbbbb']);
+  });
+
+  testWidgets('leaving with unsaved edits asks first and keeps the pasted text', (t) async {
+    final repo = _FakeRepo();
+    await t.pumpWidget(MaterialApp(
+      home: Builder(
+        builder: (context) => TextButton(
+          onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => AlarmEditPage(repo: repo, initial: _alarm()))),
+          child: const Text('mở'),
+        ),
+      ),
+    ));
+    await t.tap(find.text('mở'));
+    await t.pumpAndSettle();
+    await t.enterText(find.byKey(const Key('youtubeUrl')), 'https://youtu.be/dQw4w9WgXcQ');
+    await t.pump();
+    await t.tap(find.byType(BackButton));
+    await t.pumpAndSettle();
+    expect(find.text('Chưa lưu'), findsOneWidget);
+    await t.tap(find.text('Ở lại'));
+    await t.pumpAndSettle();
+    expect(find.text('https://youtu.be/dQw4w9WgXcQ'), findsOneWidget);
+    expect(repo.saved, isEmpty);
+  });
+
+  test('parseLinks splits on lines, spaces and commas', () {
+    expect(parseLinks('a\nb c,d\n\na'), ['a', 'b', 'c', 'd']);
+    expect(parseLinks('  '), isEmpty);
   });
 }

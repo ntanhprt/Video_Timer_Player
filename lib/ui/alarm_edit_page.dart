@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -17,6 +18,11 @@ String outputLabel(OutputKind o) => switch (o) {
       OutputKind.wired => 'Loa cắm dây',
       OutputKind.anyConnected => 'Loa đang kết nối',
     };
+
+/// Links pasted one per line (or separated by spaces/commas); blanks and repeats dropped.
+List<String> parseLinks(String text) => {
+      for (final u in text.split(RegExp(r'[\s,]+'))) if (u.trim().isNotEmpty) u.trim(),
+    }.toList();
 
 String _newId() => '${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}${Random().nextInt(1 << 20).toRadixString(36)}';
 
@@ -43,16 +49,27 @@ class _AlarmEditPageState extends State<AlarmEditPage> {
   late OutputKind _output;
   List<String> _errors = const [];
 
+  /// What the form looked like when it was opened or last saved, to tell unsaved edits.
+  late String _baseline;
+
+  String _snapshot() => jsonEncode([_name.text, parseLinks(_url.text), _schedule.toJson(), _volume.toJson(), _output.name]);
+  bool get _dirty => _snapshot() != _baseline;
+
   @override
   void initState() {
     super.initState();
     final a = widget.initial;
     _name = TextEditingController(text: a?.name ?? 'Báo thức');
-    _url = TextEditingController(text: a?.youtubeUrl ?? '');
+    _url = TextEditingController(text: (a?.youtubeUrls ?? const <String>[]).join('\n'));
     _schedule = a?.schedule ?? const Weekly(TimeOfDayMin(6, 30), {1, 2, 3, 4, 5});
     _volume = a?.volume ?? const VolumeSpec();
     _output = a?.output ?? OutputKind.anyConnected;
+    _baseline = _snapshot();
+    _name.addListener(_refresh);
+    _url.addListener(_refresh);
   }
+
+  void _refresh() => setState(() {});
 
   @override
   void dispose() {
@@ -67,7 +84,7 @@ class _AlarmEditPageState extends State<AlarmEditPage> {
       id: a?.id ?? _newId(),
       name: _name.text.trim().isEmpty ? 'Báo thức' : _name.text.trim(),
       schedule: _schedule,
-      youtubeUrl: _url.text.trim(),
+      youtubeUrls: parseLinks(_url.text),
       volume: _volume,
       output: _output,
       fallbackPath: a?.fallbackPath,
@@ -83,7 +100,9 @@ class _AlarmEditPageState extends State<AlarmEditPage> {
     setState(() => _errors = errors);
     if (errors.isNotEmpty) return;
     await widget.repo.upsert(alarm);
-    if (mounted) Navigator.of(context).maybePop();
+    if (!mounted) return;
+    setState(() => _baseline = _snapshot());
+    Navigator.of(context).maybePop();
   }
 
   Future<void> _test() async {
@@ -106,6 +125,24 @@ class _AlarmEditPageState extends State<AlarmEditPage> {
     );
   }
 
+  Future<void> _confirmLeave() async {
+    final leave = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Chưa lưu'),
+        content: const Text('Các thay đổi (kể cả link YouTube vừa dán) chưa được lưu. Thoát sẽ mất.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Ở lại')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Thoát, bỏ thay đổi')),
+        ],
+      ),
+    );
+    if (leave == true && mounted) {
+      setState(() => _baseline = _snapshot());
+      Navigator.of(context).maybePop();
+    }
+  }
+
   Future<void> _delete() async {
     final a = widget.initial;
     if (a == null) return;
@@ -123,13 +160,27 @@ class _AlarmEditPageState extends State<AlarmEditPage> {
   @override
   Widget build(BuildContext context) {
     final schedule = _schedule;
-    return Scaffold(
+    return PopScope(
+      canPop: !_dirty,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _confirmLeave();
+      },
+      child: Scaffold(
       appBar: AppBar(
-        title: Text(widget.initial == null ? 'Báo thức mới' : 'Sửa báo thức'),
+        title: Text('${widget.initial == null ? 'Báo thức mới' : 'Sửa báo thức'}${_dirty ? ' • chưa lưu' : ''}'),
         actions: [
           if (widget.initial != null) IconButton(tooltip: 'Xóa', icon: const Icon(Icons.delete_outline), onPressed: _delete),
-          TextButton(onPressed: _save, child: const Text('Lưu')),
         ],
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          child: FilledButton.icon(
+            onPressed: _save,
+            icon: const Icon(Icons.save),
+            label: const Text('Lưu'),
+          ),
+        ),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -150,10 +201,13 @@ class _AlarmEditPageState extends State<AlarmEditPage> {
           TextField(
             key: const Key('youtubeUrl'),
             controller: _url,
-            keyboardType: TextInputType.url,
+            keyboardType: TextInputType.multiline,
+            minLines: 3,
+            maxLines: 8,
             decoration: const InputDecoration(
-              labelText: 'Liên kết YouTube',
-              helperText: 'Để trống để phát nhạc dự phòng',
+              labelText: 'Liên kết YouTube (mỗi dòng một bài)',
+              helperText: 'Mỗi lần kêu phát ngẫu nhiên một bài. Để trống: phát nhạc dự phòng',
+              alignLabelWithHint: true,
             ),
           ),
           const SizedBox(height: 16),
@@ -223,6 +277,7 @@ class _AlarmEditPageState extends State<AlarmEditPage> {
           ],
         ],
       ),
+    ),
     );
   }
 

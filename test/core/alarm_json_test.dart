@@ -9,7 +9,7 @@ Alarm withSchedule(ScheduleSpec s) => Alarm(
       id: 'id-1',
       name: 'Báo thức',
       schedule: s,
-      youtubeUrl: 'https://youtu.be/dQw4w9WgXcQ',
+      youtubeUrls: ['https://youtu.be/dQw4w9WgXcQ', 'https://youtu.be/abcdefghijk'],
       volume: const VolumeSpec(start: 0.1, target: 0.9, ramp: Duration(seconds: 90), curve: RampCurve.easeOut, hold: Duration(minutes: 45)),
       output: OutputKind.bluetooth,
       fallbackPath: '/sdcard/fallback.mp3',
@@ -54,6 +54,6 @@ void main() {
 
   test('toJson uses the field names the web API relies on', () {
     final j = withSchedule(schedules[1]).toJson();
-    expect(j.keys, containsAll(['id', 'name', 'schedule', 'youtubeUrl', 'volume', 'output', 'fallbackPath', 'enabled', 'rev', 'updatedAt', 'deleted']));
+    expect(j.keys, containsAll(['id', 'name', 'schedule', 'youtubeUrls', 'volume', 'output', 'fallbackPath', 'enabled', 'rev', 'updatedAt', 'deleted']));
   });
 }

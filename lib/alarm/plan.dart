@@ -30,3 +30,17 @@ int alarmIdFor(String alarmId, int k) {
 
 /// Reserved for the "try it now" button.
 const testAlarmId = 1;
+
+/// Picks one of [tracks] for the ring of [alarmId] at [at].
+///
+/// Looks random from ring to ring but is a pure function of its inputs, so re-registering the same
+/// alarm (every sync) keeps the same pick. Null when there are no tracks.
+String? pickTrack(List<String> tracks, String alarmId, DateTime at) {
+  if (tracks.isEmpty) return null;
+  var h = 0x811c9dc5;
+  for (final c in '$alarmId@${at.millisecondsSinceEpoch ~/ 1000}'.codeUnits) {
+    h = ((h ^ c) * 0x01000193) & 0xffffffff;
+  }
+  h = (h ^ (h >> 15)) * 0x2c1b3c6d & 0xffffffff;
+  return tracks[h % tracks.length];
+}

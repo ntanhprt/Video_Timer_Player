@@ -42,4 +42,30 @@ void main() {
       expect(alarmIdFor('abc', 0), isNot(alarmIdFor('abd', 0)));
     });
   });
+
+  group('pickTrack', () {
+    final tracks = ['a', 'b', 'c'];
+    final day = DateTime(2026, 11, 3, 6, 30);
+
+    test('no tracks -> null; one track -> that track', () {
+      expect(pickTrack([], 'x', day), isNull);
+      expect(pickTrack(['only'], 'x', day), 'only');
+    });
+
+    test('is stable for the same alarm and time', () {
+      expect(pickTrack(tracks, 'x', day), pickTrack(tracks, 'x', day));
+    });
+
+    test('over many mornings every track gets played, none dominates', () {
+      final counts = <String, int>{};
+      for (var d = 0; d < 300; d++) {
+        final t = pickTrack(tracks, 'x', day.add(Duration(days: d)))!;
+        counts[t] = (counts[t] ?? 0) + 1;
+      }
+      expect(counts.keys.toSet(), tracks.toSet());
+      for (final c in counts.values) {
+        expect(c, greaterThan(60));
+      }
+    });
+  });
 }

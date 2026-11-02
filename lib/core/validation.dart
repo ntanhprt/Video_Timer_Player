@@ -6,8 +6,12 @@ import 'volume_curve.dart';
 List<String> validate(Alarm a) {
   final errors = <String>[];
 
-  if (a.youtubeUrl.trim().isNotEmpty && !_isYoutubeUrl(a.youtubeUrl)) {
-    errors.add('Liên kết phải là địa chỉ YouTube (youtube.com hoặc youtu.be).');
+  for (var i = 0; i < a.youtubeUrls.length; i++) {
+    final url = a.youtubeUrls[i];
+    if (url.trim().isNotEmpty && !_isYoutubeUrl(url)) {
+      final which = a.youtubeUrls.length > 1 ? 'Liên kết ${i + 1}' : 'Liên kết';
+      errors.add('$which phải là địa chỉ YouTube (youtube.com hoặc youtu.be).');
+    }
   }
   errors.addAll(_volumeErrors(a.volume));
 

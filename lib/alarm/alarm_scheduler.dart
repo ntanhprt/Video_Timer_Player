@@ -45,13 +45,20 @@ class AlarmScheduler {
     final cached = <String>{};
     final missing = <String>{};
     for (final a in alarms.where((a) => a.enabled)) {
-      final path = await cache.cachedPath(a.youtubeUrl);
-      if (path != null) cached.add(a.youtubeUrl);
-      if (a.youtubeUrl.trim().isNotEmpty && path == null) missing.add(a.youtubeUrl);
-      final audio = path ?? a.fallbackPath ?? fallbackAsset;
+      final paths = <String>[];
+      for (final url in a.youtubeUrls.where((u) => u.trim().isNotEmpty)) {
+        final path = await cache.cachedPath(url);
+        if (path == null) {
+          missing.add(url);
+        } else {
+          cached.add(url);
+          paths.add(path);
+        }
+      }
       var t = nextFire(a.schedule, now);
       for (var k = 0; k < occurrences && t != null; k++) {
         final id = alarmIdFor(a.id, k);
+        final audio = pickTrack(paths, a.id, t) ?? a.fallbackPath ?? fallbackAsset;
         desired[id] = _settings(a, id, t, audio);
         t = nextFire(a.schedule, t);
       }
@@ -105,26 +112,30 @@ class AlarmScheduler {
     );
   }
 
-  /// Rings [a] in [delay] with its real settings, downloading its audio first. Returns what to tell the user.
+  /// Rings [a] in [delay] with its real settings, downloading one of its tracks first.
+  /// Returns what to tell the user.
   Future<String> testIn(model.Alarm a, Duration delay) async {
     var source = 'nhạc dự phòng (chưa nhập link)';
     var path = a.fallbackPath ?? fallbackAsset;
-    if (a.youtubeUrl.trim().isNotEmpty) {
-      var cached = await cache.cachedPath(a.youtubeUrl);
-      String? error;
+    final urls = a.youtubeUrls.where((u) => u.trim().isNotEmpty).toList()..shuffle();
+    final errors = <String>[];
+    for (final url in urls) {
+      var cached = await cache.cachedPath(url);
       if (cached == null) {
-        error = await cache.download(a.youtubeUrl);
-        cached = await cache.cachedPath(a.youtubeUrl);
+        final error = await cache.download(url);
+        if (error != null) errors.add('$url -> $error');
+        cached = await cache.cachedPath(url);
       }
       if (cached != null) {
         path = cached;
-        source = 'nhạc YouTube đã tải';
-        ready.value = {...ready.value, a.youtubeUrl};
-      } else {
-        source = 'nhạc dự phòng vì không tải được YouTube ($error)';
+        source = 'bài YouTube đã tải ($url)';
+        ready.value = {...ready.value, url};
+        break;
       }
+      source = 'nhạc dự phòng vì không tải được YouTube';
     }
     await Alarm.set(alarmSettings: _settings(a, testAlarmId, _now().add(delay), path));
-    return 'Sẽ kêu sau ${delay.inSeconds} giây bằng $source.';
+    final detail = errors.isEmpty ? '' : '\nLỗi: ${errors.join('\n')}';
+    return 'Sẽ kêu sau ${delay.inSeconds} giây bằng $source.$detail';
   }
 }

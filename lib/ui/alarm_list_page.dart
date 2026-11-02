@@ -28,8 +28,12 @@ class AlarmListPage extends StatelessWidget {
       builder: (_) => AlarmEditPage(repo: repo, initial: a, onTest: (alarm) => scheduler.testIn(alarm, const Duration(seconds: 10)))));
 
   String _music(Alarm a, Set<String> ready) {
-    if (a.youtubeUrl.trim().isEmpty) return 'nhạc dự phòng';
-    return ready.contains(a.youtubeUrl) ? 'nhạc YouTube: đã tải' : 'nhạc YouTube: đang tải/chưa tải (tạm dùng nhạc dự phòng)';
+    final urls = a.youtubeUrls.where((u) => u.trim().isNotEmpty).toList();
+    if (urls.isEmpty) return 'nhạc dự phòng';
+    final done = urls.where(ready.contains).length;
+    return done == urls.length
+        ? 'nhạc YouTube: đã tải $done/${urls.length} bài (mỗi lần kêu một bài ngẫu nhiên)'
+        : 'nhạc YouTube: mới tải $done/${urls.length} bài${done == 0 ? ' (tạm dùng nhạc dự phòng)' : ''}';
   }
 
   @override
