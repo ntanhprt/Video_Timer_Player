@@ -28,6 +28,9 @@ void main() {
     repo = await SqliteAlarmRepository.open(inMemoryDatabasePath, clock: () => stamp);
   });
 
+  // The in-memory database is shared by path, so close it to start each test empty.
+  tearDown(() => repo.close());
+
   test('upsert then all returns the alarm, stamped with updatedAt', () async {
     await repo.upsert(_alarm('a'));
     final list = await repo.all();

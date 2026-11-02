@@ -37,6 +37,11 @@ class SqliteAlarmRepository implements AlarmRepository {
     return SqliteAlarmRepository._(db, clock ?? DateTime.now);
   }
 
+  Future<void> close() async {
+    await _changes.close();
+    await _db.close();
+  }
+
   /// Every row including deleted ones, for sync.
   Future<List<Alarm>> allIncludingDeleted() async => _read(await _db.query('alarms', orderBy: 'id'));
 
