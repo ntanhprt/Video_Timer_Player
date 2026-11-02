@@ -41,8 +41,9 @@ class VolumeSpec {
 /// Equals `start` at 0, `target` from `ramp` onwards, never decreases for a
 /// valid spec (target >= start).
 double volumeAt(VolumeSpec v, Duration elapsed) {
+  if (v.ramp <= Duration.zero) return v.target;
   if (elapsed <= Duration.zero) return v.start;
-  if (v.ramp <= Duration.zero || elapsed >= v.ramp) return v.target;
+  if (elapsed >= v.ramp) return v.target;
   final t = elapsed.inMicroseconds / v.ramp.inMicroseconds;
   final shaped = switch (v.curve) {
     RampCurve.linear => t,
