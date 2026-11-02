@@ -52,7 +52,7 @@ Các đầu vào/tình huống spec ngụ ý nhưng ít người test, theo th�
 - [ ] **Step 6: Verify:** `./scripts/deploy.sh` → CI xanh, APK "Hello" cài lên điện thoại, mở được. Lần chạy thứ hai cài đè được mà không gỡ (chứng minh chữ ký ổn định).
 - [ ] **Step 7: Commit** `chore: scaffold flutter + CI + deploy script`.
 
-### Task 2: Lõi thuần Dart — mô hình báo thức, tính giờ kế tiếp, đường cong âm lượng
+### Task 2: Lõi thuần Dart (**XONG** 2026-11-02, CI xanh: 39 test, chạy với TZ=America/New_York) — mô hình báo thức, tính giờ kế tiếp, đường cong âm lượng
 
 **Files:**
 - Create: `lib/core/alarm.dart`, `lib/core/schedule.dart`, `lib/core/volume_curve.dart`, `lib/core/validation.dart`
@@ -61,9 +61,9 @@ Các đầu vào/tình huống spec ngụ ý nhưng ít người test, theo th�
 **Interfaces:**
 - Produces:
   - `class Alarm { String id; String name; ScheduleSpec schedule; String youtubeUrl; VolumeSpec volume; OutputKind output; String? fallbackPath; bool enabled; int rev; DateTime updatedAt; bool deleted; }` (+ `toJson`/`fromJson`)
-  - `sealed class ScheduleSpec` với `OneShot(DateTime at)`, `Weekly(TimeOfDayMin t, Set<int> weekdays)`, `Countdown(Duration d, DateTime startedAt)`, `Windowed(TimeOfDayMin from, TimeOfDayMin to, Duration every, Set<int> weekdays)`, `Staged(List<Stage> stages)`
+  - `sealed class ScheduleSpec` với `OneShot(DateTime at)`, `Weekly(TimeOfDayMin t, Set<int> weekdays)`, `Countdown(Duration d, DateTime startedAt)`, `Windowed(TimeOfDayMin from, TimeOfDayMin to, Duration every, Set<int> weekdays)`, `Staged({TimeOfDayMin start, Set<int> weekdays, List<Stage> stages})` (mỗi `Stage` bắt đầu tại `start + offset`)
   - `DateTime? nextFire(ScheduleSpec s, DateTime now)` (giờ địa phương, null nếu không còn lần nào)
-  - `class VolumeSpec { double start; double target; Duration ramp; Curve curve; Duration hold; }`, `enum Curve { linear, easeIn, easeOut }`
+  - `class VolumeSpec { double start; double target; Duration ramp; RampCurve curve; Duration hold; }`, `enum RampCurve { linear, easeIn, easeOut }` (đổi tên từ `Curve` để khỏi trùng `Curve` của Flutter)
   - `double volumeAt(VolumeSpec v, Duration elapsed)` trong `[0,1]`, đơn điệu không giảm, `== start` ở 0, `== target` từ `ramp` trở đi
   - `List<String> validate(Alarm a)` trả danh sách lỗi (rỗng nếu hợp lệ)
 
