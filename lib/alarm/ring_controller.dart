@@ -23,6 +23,8 @@ class RingController {
 
   final _stopTimers = <int, Timer>{};
   late final VoiceBridge _voice = VoiceBridge(_onVoiceEvent);
+  VoiceBridge get bridge => _voice;
+  bool _testing = false;
   StreamSubscription<AlarmSet>? _sub;
   Set<AlarmSettings> _ringing = {};
   bool _acted = false;
@@ -86,8 +88,24 @@ class RingController {
     voiceStatus.value = lines.join('\n');
   }
 
+  /// Listens without an alarm, only to show levels and text (the microphone test screen).
+  Future<void> startTest() async {
+    _testing = true;
+    _heard.clear();
+    _partial = '';
+    voiceStatus.value = 'Đang bật micro...';
+    await _voice.start();
+  }
+
+  Future<void> stopTest() async {
+    _testing = false;
+    voiceLevel.value = 0;
+    voiceStatus.value = '';
+    if (_ringing.isEmpty) await _voice.stop();
+  }
+
   void _onVoiceEvent(String event, Object? value) {
-    if (_ringing.isEmpty) return;
+    if (_ringing.isEmpty && !_testing) return;
     switch (event) {
       case 'status':
         _show(value == 'listening' ? 'Đang nghe. Nói "tắt chuông đi" hoặc "mười phút nữa báo lại"' : '$value');
@@ -114,9 +132,13 @@ class RingController {
   }
 
   void _handle(String words) {
-    if (_acted || _ringing.isEmpty) return;
+    if (_acted) return;
     final cmd = parseVoiceCommand(words);
     if (cmd == null) return;
+    if (_ringing.isEmpty) {
+      if (_testing) voiceStatus.value = '${voiceStatus.value}\n✓ Hiểu là lệnh: $cmd';
+      return;
+    }
     _acted = true;
     final alarm = _ringing.first;
     switch (cmd) {

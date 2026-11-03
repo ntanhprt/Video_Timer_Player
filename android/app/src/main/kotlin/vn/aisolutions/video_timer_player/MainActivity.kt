@@ -29,6 +29,9 @@ class MainActivity : FlutterActivity() {
                 }
                 "start" -> voice.start(call.argument<String>("grammar") ?: "[]")
                 "stop" -> voice.stop()
+                "inputDevices" -> return@setMethodCallHandler result.success(voice.inputDevices())
+                "savedInputType" -> return@setMethodCallHandler result.success(voice.savedType())
+                "saveInputType" -> voice.saveChoice(call.argument<Int>("type") ?: -1)
                 else -> return@setMethodCallHandler result.notImplemented()
             }
             result.success(null)

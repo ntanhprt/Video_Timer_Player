@@ -19,4 +19,15 @@ class VoiceBridge {
   Future<void> start() => _channel.invokeMethod<void>('start', {'grammar': voiceGrammar()});
 
   Future<void> stop() => _channel.invokeMethod<void>('stop');
+
+  /// Microphones available right now: `{id, type, label}`.
+  Future<List<({int type, String label})>> inputDevices() async {
+    final raw = await _channel.invokeListMethod<Map<Object?, Object?>>('inputDevices') ?? [];
+    return [for (final m in raw) (type: m['type'] as int, label: m['label'] as String)];
+  }
+
+  /// Saved microphone type (an `AudioDeviceInfo` type), or -1 for automatic.
+  Future<int> savedInputType() async => await _channel.invokeMethod<int>('savedInputType') ?? -1;
+
+  Future<void> saveInputType(int type) => _channel.invokeMethod<void>('saveInputType', {'type': type});
 }

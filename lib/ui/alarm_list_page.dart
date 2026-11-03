@@ -7,6 +7,8 @@ import '../data/alarm_repository.dart';
 import 'about_page.dart';
 import 'alarm_edit_page.dart';
 import 'alarm_summary.dart';
+import 'mic_test_page.dart';
+import '../alarm/ring_controller.dart';
 
 const _short = {1: 'T2', 2: 'T3', 3: 'T4', 4: 'T5', 5: 'T6', 6: 'T7', 7: 'CN'};
 
@@ -24,7 +26,8 @@ String describeNext(DateTime? next, DateTime now) {
 class AlarmListPage extends StatelessWidget {
   final AlarmRepository repo;
   final AlarmScheduler scheduler;
-  const AlarmListPage({super.key, required this.repo, required this.scheduler});
+  final RingController? ring;
+  const AlarmListPage({super.key, required this.repo, required this.scheduler, this.ring});
 
   void _open(BuildContext context, [Alarm? a]) => Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => AlarmEditPage(repo: repo, initial: a, onTest: (alarm, log) => scheduler.testIn(alarm, const Duration(seconds: 10), log: log),
@@ -121,6 +124,12 @@ class AlarmListPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Đánh thức'), actions: [
+        if (ring != null)
+          IconButton(
+            tooltip: 'Micro & giọng nói',
+            icon: const Icon(Icons.mic),
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => MicTestPage(ring: ring!))),
+          ),
         IconButton(
           tooltip: 'Phiên bản & có gì mới',
           icon: const Icon(Icons.info_outline),

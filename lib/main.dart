@@ -21,7 +21,7 @@ Future<void> main() async {
   repo.watch().listen((_) => scheduler.sync());
   WidgetsBinding.instance.addObserver(_OnResume(scheduler.sync));
   final ring = RingController(onSnooze: snooze)..start();
-  runApp(App(repo: repo, scheduler: scheduler, voiceStatus: ring.voiceStatus, voiceLevel: ring.voiceLevel));
+  runApp(App(repo: repo, scheduler: scheduler, voiceStatus: ring.voiceStatus, voiceLevel: ring.voiceLevel, ring: ring));
   _askPermissions();
 }
 
@@ -49,7 +49,8 @@ class App extends StatelessWidget {
   final AlarmScheduler scheduler;
   final ValueListenable<String>? voiceStatus;
   final ValueListenable<double>? voiceLevel;
-  const App({super.key, required this.repo, required this.scheduler, this.voiceStatus, this.voiceLevel});
+  final RingController? ring;
+  const App({super.key, required this.repo, required this.scheduler, this.voiceStatus, this.voiceLevel, this.ring});
 
   @override
   Widget build(BuildContext context) {
@@ -58,7 +59,7 @@ class App extends StatelessWidget {
       theme: ThemeData(colorSchemeSeed: Colors.deepOrange, useMaterial3: true),
       darkTheme: ThemeData(colorSchemeSeed: Colors.deepOrange, useMaterial3: true, brightness: Brightness.dark),
       builder: (context, child) => RingingOverlay(voiceStatus: voiceStatus, voiceLevel: voiceLevel, child: child!),
-      home: AlarmListPage(repo: repo, scheduler: scheduler),
+      home: AlarmListPage(repo: repo, scheduler: scheduler, ring: ring),
     );
   }
 }

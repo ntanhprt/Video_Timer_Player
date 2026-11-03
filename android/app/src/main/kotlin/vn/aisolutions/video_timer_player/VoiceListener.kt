@@ -52,6 +52,38 @@ class VoiceListener(private val ctx: Context, private val emit: (String, Any?) -
         }
     }
 
+    private val am get() = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    private val prefs get() = ctx.getSharedPreferences("voice", Context.MODE_PRIVATE)
+
+    private fun typeName(t: Int) = when (t) {
+        AudioDeviceInfo.TYPE_BUILTIN_MIC -> "Micro của máy"
+        AudioDeviceInfo.TYPE_WIRED_HEADSET -> "Tai nghe / loa cắm dây (3.5 mm)"
+        AudioDeviceInfo.TYPE_WIRED_HEADPHONES -> "Tai nghe có dây"
+        AudioDeviceInfo.TYPE_USB_DEVICE, AudioDeviceInfo.TYPE_USB_HEADSET -> "USB"
+        AudioDeviceInfo.TYPE_BLUETOOTH_SCO -> "Bluetooth"
+        AudioDeviceInfo.TYPE_TELEPHONY -> "Điện thoại"
+        else -> "Nguồn khác (loại $t)"
+    }
+
+    private fun deviceLabel(d: AudioDeviceInfo) = "${typeName(d.type)} — ${d.productName}"
+
+    /** Input sources on the phone right now: [{id, label}]. */
+    fun inputDevices(): List<Map<String, Any>> =
+        am.getDevices(AudioManager.GET_DEVICES_INPUTS).map { mapOf("id" to it.id, "type" to it.type, "label" to deviceLabel(it)) }
+
+    /** The saved choice (by type, since ids change), or null for "automatic = the phone's own mic". */
+    fun savedType(): Int = prefs.getInt("type", -1)
+
+    fun saveChoice(type: Int) {
+        prefs.edit().putInt("type", type).apply()
+    }
+
+    private fun chosenDevice(): AudioDeviceInfo? {
+        val all = am.getDevices(AudioManager.GET_DEVICES_INPUTS)
+        val want = savedType()
+        return all.firstOrNull { want != -1 && it.type == want } ?: all.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_MIC }
+    }
+
     fun start(grammarJson: String) {
         if (running) return
         running = true
@@ -74,12 +106,11 @@ class VoiceListener(private val ctx: Context, private val emit: (String, Any?) -
                 }
                 // A speaker/headset on the 3.5 mm jack makes Android pick a headset mic that hears
                 // nothing: always use the phone's own microphone.
-                val am = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-                val builtin = am.getDevices(AudioManager.GET_DEVICES_INPUTS).firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_MIC }
+                val builtin = chosenDevice()
                 if (builtin != null) record.setPreferredDevice(builtin)
                 record.startRecording()
                 emit("status", "listening")
-                emit("device", builtin?.productName?.toString() ?: "micro mặc định")
+                emit("device", builtin?.let { deviceLabel(it) } ?: "micro mặc định")
                 val buf = ShortArray(1600) // 100 ms
                 val bytes = ByteArray(buf.size * 2)
                 var lastPartial = ""
