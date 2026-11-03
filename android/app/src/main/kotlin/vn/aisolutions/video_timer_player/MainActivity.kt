@@ -43,7 +43,9 @@ class MainActivity : FlutterActivity() {
                         File(out).parentFile?.mkdirs()
                         File(out).delete()
                         val req = YoutubeDLRequest(url)
-                        req.addOption("-f", "bestaudio[ext=m4a]/bestaudio")
+                        // Audio only (never video). Best AAC while the file stays under 64 MB; a long video
+                        // falls back to the low-bitrate AAC so it does not take hundreds of MB.
+                        req.addOption("-f", "bestaudio[ext=m4a][filesize<64M]/bestaudio[ext=m4a][abr<=70]/bestaudio[ext=m4a]/bestaudio")
                         req.addOption("--no-playlist")
                         if (titleOut != null) {
                             // Save the video title next to the audio so the app can list it by name.
