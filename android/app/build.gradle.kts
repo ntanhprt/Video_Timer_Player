@@ -34,6 +34,13 @@ android {
         // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // yt-dlp's bundled Python is large: ship it for 64-bit ARM phones only.
+        ndk { abiFilters += listOf("arm64-v8a") }
+    }
+
+    packaging {
+        // youtubedl-android unpacks Python/yt-dlp from native libs at run time.
+        jniLibs { useLegacyPackaging = true }
     }
 
     signingConfigs {
@@ -64,4 +71,8 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    implementation("io.github.junkfood02.youtubedl-android:library:0.18.1")
 }

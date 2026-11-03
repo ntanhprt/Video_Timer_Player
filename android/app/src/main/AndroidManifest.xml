@@ -12,6 +12,7 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY"/>
     <application
+        android:extractNativeLibs="true"
         android:label="video_timer_player"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">

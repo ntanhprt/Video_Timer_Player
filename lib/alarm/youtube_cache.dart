@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
@@ -40,6 +41,34 @@ class YoutubeCache {
 
   /// Downloads the audio of [url]. Returns null on success, otherwise a short reason.
   Future<String?> download(String url) async {
+    final viaYtDlp = await _ytDlp(url);
+    if (viaYtDlp == null) return null;
+    final viaExplode = await _explode(url);
+    return viaExplode == null ? null : 'yt-dlp: $viaYtDlp\nexplode: $viaExplode';
+  }
+
+  static const _channel = MethodChannel('vn.aisolutions/ytdlp');
+
+  /// yt-dlp bundled in the app (the same engine other downloader apps use). Null on success.
+  Future<String?> _ytDlp(String url) async {
+    try {
+      final target = await _file(url);
+      final tmp = '${target.path}.part.m4a';
+      await _channel.invokeMethod<String>('download', {'url': url.trim(), 'out': tmp});
+      await File(tmp).rename(target.path);
+      return null;
+    } on PlatformException catch (e) {
+      debugPrint('YT yt-dlp failed [${e.message}]');
+      return e.message ?? 'không rõ lỗi';
+    } on MissingPluginException {
+      return 'yt-dlp không có trong bản này';
+    } catch (e) {
+      debugPrint('YT yt-dlp failed [$e]');
+      return '$e';
+    }
+  }
+
+  Future<String?> _explode(String url) async {
     final wait = _blockedUntil?.difference(DateTime.now());
     if (wait != null && !wait.isNegative) {
       return 'YouTube đang giới hạn tốc độ từ mạng này, tự thử lại sau ~${wait.inMinutes + 1} phút';
