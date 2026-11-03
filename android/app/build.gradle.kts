@@ -44,6 +44,14 @@ android {
     }
 
     signingConfigs {
+        // A fixed, non-secret debug key committed to the repo: every CI build gets the same
+        // signature, so a new APK installs over the old one without wiping the app's data.
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
         create("release") {
             if (keyProps.isNotEmpty()) {
                 storeFile = file(keyProps.getProperty("storeFile"))

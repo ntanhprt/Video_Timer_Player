@@ -14,6 +14,7 @@ import kotlin.concurrent.thread
 class MainActivity : FlutterActivity() {
     private val main = Handler(Looper.getMainLooper())
     private var channel: MethodChannel? = null
+    private var updated = false
 
     private fun log(msg: String) = main.post { channel?.invokeMethod("log", msg) }
 
@@ -28,7 +29,18 @@ class MainActivity : FlutterActivity() {
                     val reply: Pair<String?, String?> = try {
                         log("Khởi tạo yt-dlp...")
                         YoutubeDL.getInstance().init(applicationContext)
-                        log("Đã khởi tạo. Đang lấy và tải âm thanh...")
+                        if (!updated) {
+                            // The bundled yt-dlp ages quickly and YouTube changes often: fetch the latest.
+                            log("Cập nhật yt-dlp bản mới nhất (cần mạng)...")
+                            try {
+                                val st = YoutubeDL.getInstance().updateYoutubeDL(applicationContext, YoutubeDL.UpdateChannel.STABLE)
+                                log("Cập nhật yt-dlp: $st, phiên bản ${YoutubeDL.getInstance().versionName(applicationContext)}")
+                                updated = true
+                            } catch (e: Throwable) {
+                                log("Không cập nhật được yt-dlp: ${e.message}")
+                            }
+                        }
+                        log("Đang lấy và tải âm thanh...")
                         File(out).parentFile?.mkdirs()
                         File(out).delete()
                         val req = YoutubeDLRequest(url)
@@ -37,7 +49,7 @@ class MainActivity : FlutterActivity() {
                         req.addOption("-o", out)
                         YoutubeDL.getInstance().execute(req) { progress, eta, line ->
                             val l = line.trim()
-                            if (l.isNotEmpty()) log("yt-dlp ${"$"}{progress.toInt()}% (còn ${"$"}{eta}s): ${"$"}l")
+                            if (l.isNotEmpty()) log("yt-dlp ${progress.toInt()}% (còn ${eta}s): $l")
                         }
                         if (File(out).length() > 0) Pair(out, null) else Pair(null, "yt-dlp không tạo ra tệp")
                     } catch (e: Throwable) {
