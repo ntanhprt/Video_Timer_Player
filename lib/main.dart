@@ -14,6 +14,7 @@ import 'alarm/ring_controller.dart';
 import 'alarm/tuya_alarms.dart';
 import 'tuya/tuya_client.dart';
 import 'tuya/tuya_hub.dart';
+import 'tuya/tuya_models.dart';
 import 'alarm/youtube_cache.dart';
 import 'data/alarm_repository.dart';
 import 'ui/alarm_list_page.dart';
