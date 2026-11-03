@@ -4,6 +4,15 @@ typedef ChangelogEntry = ({String version, String date, List<String> changes});
 
 const changelog = <ChangelogEntry>[
   (
+    version: '0.7.0',
+    date: '03/11/2026',
+    changes: [
+      'Trang chính có thẻ Tuya (logo cam): bấm vào để cài đặt ổ cắm thông minh: Device ID, IP, Local key, phiên bản giao thức 3.3 / 3.4, số công tắc, thời gian bật trước chuông, tắt khi chuông dừng.',
+      'Nút "Thử BẬT" / "Thử TẮT" kèm nhật ký từng bước. App điều khiển ổ cắm trực tiếp qua wifi nhà (giao thức Tuya LAN 3.3 và 3.4, kiểm tra từng byte với TinyTuya).',
+      'Chưa nối vào báo thức: bước tiếp theo là tự bật ổ cắm trước giờ chuông và tắt khi chuông dừng.',
+    ],
+  ),
+  (
     version: '0.6.0',
     date: '03/11/2026',
     changes: [

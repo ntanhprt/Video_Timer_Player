@@ -8,6 +8,9 @@ import 'about_page.dart';
 import 'alarm_edit_page.dart';
 import 'alarm_summary.dart';
 import 'mic_test_page.dart';
+import 'tuya_page.dart';
+import '../tuya/tuya_client.dart';
+import '../tuya/tuya_config.dart';
 import '../alarm/ring_controller.dart';
 
 const _short = {1: 'T2', 2: 'T3', 3: 'T4', 4: 'T5', 5: 'T6', 6: 'T7', 7: 'CN'};
@@ -27,7 +30,10 @@ class AlarmListPage extends StatelessWidget {
   final AlarmRepository repo;
   final AlarmScheduler scheduler;
   final RingController? ring;
-  const AlarmListPage({super.key, required this.repo, required this.scheduler, this.ring});
+  final ValueNotifier<TuyaConfig>? tuya;
+  final TuyaConfigStore? tuyaStore;
+  final TuyaClient? tuyaClient;
+  const AlarmListPage({super.key, required this.repo, required this.scheduler, this.ring, this.tuya, this.tuyaStore, this.tuyaClient});
 
   void _open(BuildContext context, [Alarm? a]) => Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => AlarmEditPage(repo: repo, initial: a, onTest: (alarm, log) => scheduler.testIn(alarm, const Duration(seconds: 10), log: log),
@@ -142,7 +148,9 @@ class AlarmListPage extends StatelessWidget {
         icon: const Icon(Icons.add_alarm),
         label: const Text('Thêm'),
       ),
-      body: StreamBuilder<List<Alarm>>(
+      body: Column(children: [
+        if (tuya != null && tuyaStore != null && tuyaClient != null) TuyaTile(config: tuya!, store: tuyaStore!, client: tuyaClient!),
+        Expanded(child: StreamBuilder<List<Alarm>>(
         stream: repo.watch(),
         builder: (context, snap) {
           final alarms = snap.data;
@@ -159,7 +167,8 @@ class AlarmListPage extends StatelessWidget {
             ),
           );
         },
-      ),
+      )),
+      ]),
     );
   }
 }
