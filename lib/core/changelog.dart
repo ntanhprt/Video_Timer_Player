@@ -10,6 +10,7 @@ const changelog = <ChangelogEntry>[
       'Màn hình báo thức có đồng hồ lớn (giờ:phút:giây, ngày tháng).',
       'Nút "Báo lại sau" 5, 10, 15, 20, 30 phút và 1 giờ.',
       'Hiện phiên bản và mục "Có gì mới" trong app.',
+      'Màn hình báo thức: nút TẮT và 6 nút báo lại sau rất to, phủ kín màn hình, dễ bấm khi còn ngái ngủ.',
       'Cập nhật app không làm mất báo thức và nhạc đã tải (khóa ký cố định).',
     ],
   ),

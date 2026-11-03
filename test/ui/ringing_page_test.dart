@@ -23,7 +23,7 @@ void main() {
   testWidgets('shows the alarm name and a stop button that calls onStop', (t) async {
     var stopped = 0;
     await pump(t, onStop: () => stopped++);
-    expect(find.text('Dậy đi'), findsOneWidget);
+    expect(find.textContaining('Dậy đi'), findsOneWidget);
     await t.tap(find.text('TẮT'));
     expect(stopped, 1);
   });

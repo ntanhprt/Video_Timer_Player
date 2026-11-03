@@ -57,62 +57,87 @@ class _RingingPageState extends State<RingingPage> {
     return Material(
       color: scheme.primaryContainer,
       child: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  '${_two(_now.hour)}:${_two(_now.minute)}:${_two(_now.second)}',
-                  key: const Key('clock'),
-                  style: text.displayLarge?.copyWith(
-                    color: on,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 84,
-                    fontFeatures: const [FontFeature.tabularFigures()],
+              Expanded(
+                flex: 3,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${_two(_now.hour)}:${_two(_now.minute)}:${_two(_now.second)}',
+                        key: const Key('clock'),
+                        style: text.displayLarge?.copyWith(color: on, fontWeight: FontWeight.bold, fontSize: 88, fontFeatures: const [FontFeature.tabularFigures()]),
+                      ),
+                      Text(
+                        '${_days[_now.weekday - 1]}, ${_two(_now.day)}/${_two(_now.month)}/${_now.year}  •  ${widget.alarm.notificationSettings.title}',
+                        style: text.titleMedium?.copyWith(color: on),
+                      ),
+                    ],
                   ),
                 ),
               ),
-              Text(
-                '${_days[_now.weekday - 1]}, ${_two(_now.day)}/${_two(_now.month)}/${_now.year}',
-                textAlign: TextAlign.center,
-                style: text.titleLarge?.copyWith(color: on),
-              ),
-              const SizedBox(height: 24),
-              Text(widget.alarm.notificationSettings.title, textAlign: TextAlign.center, style: text.headlineMedium?.copyWith(color: on)),
-              const SizedBox(height: 4),
-              Text(widget.alarm.notificationSettings.body, textAlign: TextAlign.center, style: text.titleMedium?.copyWith(color: on)),
-              const SizedBox(height: 24),
-              SizedBox(
-                height: 96,
+              const SizedBox(height: 8),
+              // One huge stop button: easy to hit half asleep.
+              Expanded(
+                flex: 5,
                 child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: scheme.error,
+                    foregroundColor: scheme.onError,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                  ),
                   onPressed: widget.onStop,
-                  child: const Text('TẮT', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
+                  child: const FittedBox(child: Padding(padding: EdgeInsets.all(8), child: Text('TẮT', style: TextStyle(fontSize: 96, fontWeight: FontWeight.w900)))),
                 ),
               ),
-              const SizedBox(height: 24),
-              Text('Báo lại sau', textAlign: TextAlign.center, style: text.titleMedium?.copyWith(color: on)),
-              const SizedBox(height: 8),
-              GridView.count(
-                crossAxisCount: 3,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                childAspectRatio: 1.8,
-                children: [
-                  for (final c in snoozeChoices)
-                    FilledButton.tonal(
-                      onPressed: () => widget.onSnooze(Duration(minutes: c.minutes)),
-                      child: Text(c.label, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
-                    ),
-                ],
+              const SizedBox(height: 12),
+              Text('BÁO LẠI SAU', textAlign: TextAlign.center, style: text.titleMedium?.copyWith(color: on, fontWeight: FontWeight.bold, letterSpacing: 2)),
+              const SizedBox(height: 6),
+              // 2 columns x 3 rows of big blocks filling the rest of the screen.
+              Expanded(
+                flex: 7,
+                child: Column(
+                  children: [
+                    for (var row = 0; row < 3; row++)
+                      Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.only(bottom: row < 2 ? 10 : 0),
+                          child: Row(
+                            children: [
+                              for (var col = 0; col < 2; col++) ...[
+                                if (col == 1) const SizedBox(width: 10),
+                                Expanded(child: _snoozeButton(snoozeChoices[row * 2 + col], scheme)),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _snoozeButton(({String label, int minutes}) c, ColorScheme scheme) {
+    return SizedBox.expand(
+      child: FilledButton.tonal(
+        style: FilledButton.styleFrom(
+          backgroundColor: scheme.secondary,
+          foregroundColor: scheme.onSecondary,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        ),
+        onPressed: () => widget.onSnooze(Duration(minutes: c.minutes)),
+        child: FittedBox(child: Padding(padding: const EdgeInsets.all(6), child: Text(c.label, style: const TextStyle(fontSize: 44, fontWeight: FontWeight.w800)))),
       ),
     );
   }
