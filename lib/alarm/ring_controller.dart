@@ -4,6 +4,10 @@ import 'package:alarm/alarm.dart';
 import 'package:alarm/utils/alarm_set.dart';
 import 'package:flutter/foundation.dart';
 
+import 'commands/builtin.dart';
+import 'commands/custom.dart';
+import 'commands/intent.dart';
+import 'commands/registry.dart';
 import 'plan.dart';
 import 'voice_bridge.dart';
 import 'voice_command.dart';
@@ -32,13 +36,55 @@ class RingController {
   String _partial = '';
   final _heard = <String>[];
 
-  RingController({required this.onSnooze, DateTime Function()? clock}) : _now = clock ?? DateTime.now;
+  /// Every command the app understands (built-in plus the ones the user taught).
+  final registry = CommandRegistry()..registerAll(builtinIntents());
+
+  /// Where the user's own commands are kept; null disables teaching.
+  final CustomCommandStore? store;
+
+  /// The user's own commands.
+  final customCommands = ValueNotifier<List<CustomCommand>>([]);
+
+  /// Sentences heard but not understood: the user can teach one of them as a command.
+  final unrecognized = ValueNotifier<List<String>>([]);
+
+  RingController({required this.onSnooze, this.store, DateTime Function()? clock}) : _now = clock ?? DateTime.now;
 
   void start() {
+    unawaited(_loadCustom());
     _sub = Alarm.ringing.listen((s) => _onRinging(s.alarms));
     _onRinging(Alarm.ringing.value.alarms);
     // Load the speech model now rather than at the moment the alarm rings.
     unawaited(_voice.prepare().catchError((Object e) => debugPrint('Voice prepare failed: $e')));
+  }
+
+  Future<void> _loadCustom() async {
+    customCommands.value = await store?.load() ?? [];
+    _registerCustom();
+  }
+
+  void _registerCustom() {
+    registry.unregisterPrefix(customPrefix);
+    final list = customCommands.value;
+    for (var i = 0; i < list.length; i++) {
+      registry.register(customIntent(i, list[i]));
+    }
+  }
+
+  /// Teaches the app: from now on saying [phrase] does [action] ("stop" or "snooze").
+  Future<void> teach(String phrase, String action, {int minutes = 10}) async {
+    final c = CustomCommand(phrase: phrase.trim(), action: action, minutes: minutes);
+    if (c.phrase.isEmpty) return;
+    customCommands.value = [...customCommands.value.where((e) => e.phrase != c.phrase), c];
+    unrecognized.value = [...unrecognized.value]..remove(phrase);
+    _registerCustom();
+    await store?.save(customCommands.value);
+  }
+
+  Future<void> forget(CustomCommand c) async {
+    customCommands.value = [...customCommands.value]..remove(c);
+    _registerCustom();
+    await store?.save(customCommands.value);
   }
 
   void dispose() {
@@ -117,37 +163,48 @@ class RingController {
       case 'partial':
         _partial = '$value';
         _show('Đang nghe...');
+        _handle('$value', isFinal: false);
       case 'final':
         _partial = '';
         _heard.add('"$value"');
         if (_heard.length > 3) _heard.removeAt(0);
         _show('Đang nghe...');
-        _handle('$value');
-      case 'cmd':
-        // From the recogniser limited to the command phrases.
-        _handle('$value');
+        _handle('$value', isFinal: true);
       case 'error':
         _show('Giọng nói lỗi: $value');
     }
   }
 
-  void _handle(String words) {
+  String _lastRun = '';
+
+  /// Understands [words] and runs the command, if it is one. [isFinal] is false for the running
+  /// guess made while the user is still speaking: only commands that end the ringing act on it,
+  /// so a half sentence cannot, say, answer "what time is it" twice.
+  void _handle(String words, {required bool isFinal}) {
     if (_acted) return;
-    final cmd = parseVoiceCommand(words);
-    if (cmd == null) return;
-    if (_ringing.isEmpty) {
-      if (_testing) voiceStatus.value = '${voiceStatus.value}\n✓ Hiểu là lệnh: $cmd';
+    final tokens = tokenizeVietnamese(words);
+    final m = registry.match(tokens);
+    if (m == null) {
+      if (isFinal && tokens.length >= 2) {
+        final heard = words.trim().toLowerCase();
+        if (!unrecognized.value.contains(heard)) unrecognized.value = [heard, ...unrecognized.value].take(6).toList();
+      }
       return;
     }
-    _acted = true;
-    final alarm = _ringing.first;
-    switch (cmd) {
-      case StopCommand():
-        voiceStatus.value = 'Đã nghe lệnh "$words": TẮT CHUÔNG';
-        unawaited(Alarm.stop(alarm.id));
-      case SnoozeCommand(:final delay):
-        voiceStatus.value = 'Đã nghe lệnh "$words": BÁO LẠI SAU ${delay.inMinutes} PHÚT';
-        unawaited(onSnooze(alarm, delay));
-    }
+    if (!m.intent.endsRing && !isFinal) return;
+    if (!m.intent.endsRing && _lastRun == words) return;
+    _lastRun = words;
+    final ringing = _ringing.isNotEmpty ? _ringing.first : null;
+    final ctx = CommandContext(
+      stop: () async => ringing == null ? voiceStatus.value = '(thử) sẽ tắt chuông' : await Alarm.stop(ringing.id),
+      snooze: (d) async => ringing == null ? voiceStatus.value = '(thử) sẽ báo lại sau ${d.inMinutes} phút' : await onSnooze(ringing, d),
+      say: (t) => voiceStatus.value = t,
+      now: _now,
+      describeCommands: registry.describe,
+    );
+    if (m.intent.endsRing && ringing != null) _acted = true;
+    unawaited(m.intent.run(ctx, m.args).then((msg) {
+      if (msg != null) voiceStatus.value = 'Đã nghe "$words"\n→ $msg';
+    }));
   }
 }

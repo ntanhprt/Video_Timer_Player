@@ -4,6 +4,15 @@ typedef ChangelogEntry = ({String version, String date, List<String> changes});
 
 const changelog = <ChangelogEntry>[
   (
+    version: '0.6.0',
+    date: '03/11/2026',
+    changes: [
+      'Hệ thống lệnh giọng nói mở rộng được: mỗi lệnh là một khai báo (mẫu câu, tham số, hành động) đăng ký vào bộ lệnh; thêm lệnh mới không cần sửa phần còn lại. Khớp mờ để chịu lỗi nhận dạng.',
+      'Lệnh mới: "mấy giờ rồi", "các lệnh", "dậy rồi" (tắt), "mười phút nữa" (báo lại).',
+      'Tự học lệnh: câu app nghe mà chưa hiểu hiện trong trang Micro & giọng nói; bấm vào để dạy nó làm "Tắt chuông" hoặc "Báo lại N phút". Lệnh đã dạy được lưu và xóa được.',
+    ],
+  ),
+  (
     version: '0.5.0',
     date: '03/11/2026',
     changes: [

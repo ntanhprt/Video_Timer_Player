@@ -88,36 +88,48 @@ const _sixUnits = {'phut', 'gio', 'tieng'};
 
 bool _hasPhrase(String folded, List<String> phrases) => phrases.any((p) => RegExp('\\b$p\\b').hasMatch(folded));
 
+/// Lower-case, diacritic-free words of [text]: the form every command is matched in.
+List<String> tokenizeVietnamese(String text) {
+  final folded = foldVietnamese(text).replaceAll(RegExp(r'[^a-z0-9 ]'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+  return folded.isEmpty ? const [] : folded.split(' ');
+}
+
+/// An amount of time said in [tokens] ("mười lăm phút", "10 phút", "một tiếng rưỡi", "nửa tiếng"),
+/// or null when none is said. A bare number counts as minutes.
+Duration? readTimeAmount(List<String> tokens) {
+  final n = _readNumber(tokens);
+  if (n != null) {
+    var minutes = n.value;
+    final unit = n.next < tokens.length ? tokens[n.next] : '';
+    if (unit == 'gio' || unit == 'tieng') {
+      minutes *= 60;
+      if (n.next + 1 < tokens.length && tokens[n.next + 1] == 'ruoi') minutes += 30;
+    }
+    return Duration(minutes: minutes);
+  }
+  for (var i = 0; i + 1 < tokens.length; i++) {
+    if (tokens[i] == 'nua' && (tokens[i + 1] == 'gio' || tokens[i + 1] == 'tieng')) return const Duration(minutes: 30);
+  }
+  return null;
+}
+
+/// Keeps a spoken snooze between one minute and [maxVoiceSnooze]; nothing sensible → the default.
+Duration clampSnooze(Duration? d) {
+  if (d == null || d < const Duration(minutes: 1)) return defaultVoiceSnooze;
+  return d > maxVoiceSnooze ? maxVoiceSnooze : d;
+}
+
 /// Turns recognised speech into a command, or null when it is not one.
 ///
 /// "tắt chuông đi" → stop; "mười phút nữa báo lại" / "báo lại sau 1 tiếng" → snooze.
 /// Snoozing wins when a sentence has both ("tắt đi, 10 phút nữa báo lại").
 VoiceCommand? parseVoiceCommand(String text) {
-  final folded = foldVietnamese(text).replaceAll(RegExp(r'[^a-z0-9 ]'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
-  if (folded.isEmpty) return null;
+  final tokens = tokenizeVietnamese(text);
+  if (tokens.isEmpty) return null;
+  final folded = tokens.join(' ');
 
   const snoozeWords = ['bao lai', 'nhac lai', 'ngu them', 'hoan lai', 'bao thuc lai', 'keu lai'];
-  if (_hasPhrase(folded, snoozeWords)) {
-    final tokens = folded.split(' ');
-    final n = _readNumber(tokens);
-    Duration d;
-    if (n != null) {
-      var minutes = n.value;
-      final unit = n.next < tokens.length ? tokens[n.next] : '';
-      if (unit == 'gio' || unit == 'tieng') {
-        minutes *= 60;
-        if (n.next + 1 < tokens.length && tokens[n.next + 1] == 'ruoi') minutes += 30;
-      }
-      d = Duration(minutes: minutes);
-    } else if (RegExp(r'\bnua (gio|tieng)\b').hasMatch(folded)) {
-      d = const Duration(minutes: 30);
-    } else {
-      d = defaultVoiceSnooze;
-    }
-    if (d < const Duration(minutes: 1)) d = defaultVoiceSnooze;
-    if (d > maxVoiceSnooze) d = maxVoiceSnooze;
-    return SnoozeCommand(d);
-  }
+  if (_hasPhrase(folded, snoozeWords)) return SnoozeCommand(clampSnooze(readTimeAmount(tokens)));
 
   const stopPhrases = [
     'tat chuong', 'tat bao thuc', 'tat nhac', 'tat di', 'tat het', 'tat may', 'tat loa', 'tat dong ho',

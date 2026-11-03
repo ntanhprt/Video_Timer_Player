@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../alarm/commands/custom.dart';
 import '../alarm/ring_controller.dart';
 
 /// Pick the microphone used for voice commands and try it: shows the loudness and the text heard.
@@ -62,6 +63,39 @@ class _MicTestPageState extends State<MicTestPage> {
     await widget.ring.startTest();
   }
 
+  /// Asks what the heard sentence should do, then remembers it as a command.
+  Future<void> _teach(String heard) async {
+    final phrase = TextEditingController(text: heard);
+    final minutes = TextEditingController(text: '10');
+    var action = 'stop';
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: const Text('Dạy lệnh mới'),
+          content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            TextField(controller: phrase, decoration: const InputDecoration(labelText: 'Khi anh nói câu này (sửa lại cho đúng nếu app nghe sai)')),
+            RadioGroup<String>(
+              groupValue: action,
+              onChanged: (v) => setLocal(() => action = v ?? action),
+              child: const Column(children: [
+                RadioListTile<String>(value: 'stop', title: Text('Tắt chuông')),
+                RadioListTile<String>(value: 'snooze', title: Text('Báo lại sau...')),
+              ]),
+            ),
+            if (action == 'snooze')
+              TextField(controller: minutes, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Số phút')),
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Hủy')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Lưu lệnh')),
+          ],
+        ),
+      ),
+    );
+    if (ok == true) await widget.ring.teach(phrase.text, action, minutes: int.tryParse(minutes.text) ?? 10);
+  }
+
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
@@ -97,6 +131,43 @@ class _MicTestPageState extends State<MicTestPage> {
           valueListenable: widget.ring.voiceStatus,
           builder: (_, v, _) => SelectableText(v.isEmpty ? 'Chưa nghe gì.' : v, style: text.titleMedium),
         ),
+        const Divider(height: 32),
+        Text('Câu chưa hiểu — bấm để dạy app', style: text.titleMedium),
+        ValueListenableBuilder<List<String>>(
+          valueListenable: widget.ring.unrecognized,
+          builder: (_, list, _) => list.isEmpty
+              ? const Padding(padding: EdgeInsets.all(8), child: Text('Chưa có. Nói một câu app chưa hiểu, nó sẽ hiện ở đây.'))
+              : Column(children: [
+                  for (final s in list)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.school),
+                      title: Text('"$s"'),
+                      subtitle: const Text('Bấm để chọn câu này làm lệnh gì'),
+                      onTap: () => _teach(s),
+                    ),
+                ]),
+        ),
+        const Divider(height: 32),
+        Text('Lệnh anh đã dạy', style: text.titleMedium),
+        ValueListenableBuilder<List<CustomCommand>>(
+          valueListenable: widget.ring.customCommands,
+          builder: (_, list, _) => list.isEmpty
+              ? const Padding(padding: EdgeInsets.all(8), child: Text('Chưa có lệnh nào.'))
+              : Column(children: [
+                  for (final c in list)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.record_voice_over),
+                      title: Text('"${c.phrase}"'),
+                      subtitle: Text('→ ${c.label}'),
+                      trailing: IconButton(icon: const Icon(Icons.delete_outline), tooltip: 'Xóa lệnh', onPressed: () => widget.ring.forget(c)),
+                    ),
+                ]),
+        ),
+        const Divider(height: 32),
+        Text('Lệnh có sẵn', style: text.titleMedium),
+        for (final line in widget.ring.registry.describe()) Padding(padding: const EdgeInsets.symmetric(vertical: 2), child: Text('• $line')),
       ]),
     );
   }

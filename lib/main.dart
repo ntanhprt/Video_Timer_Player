@@ -1,11 +1,15 @@
+import 'dart:io';
+
 import 'package:alarm/alarm.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:sqflite/sqflite.dart';
 
 import 'alarm/alarm_scheduler.dart';
+import 'alarm/commands/custom.dart';
 import 'alarm/ring_controller.dart';
 import 'alarm/youtube_cache.dart';
 import 'data/alarm_repository.dart';
@@ -20,7 +24,8 @@ Future<void> main() async {
   // Every edit re-registers the native alarms; so does coming back to the app.
   repo.watch().listen((_) => scheduler.sync());
   WidgetsBinding.instance.addObserver(_OnResume(scheduler.sync));
-  final ring = RingController(onSnooze: snooze)..start();
+  final support = await getApplicationSupportDirectory();
+  final ring = RingController(onSnooze: snooze, store: CustomCommandStore(File(p.join(support.path, 'voice_commands.json'))))..start();
   runApp(App(repo: repo, scheduler: scheduler, voiceStatus: ring.voiceStatus, voiceLevel: ring.voiceLevel, ring: ring));
   _askPermissions();
 }
