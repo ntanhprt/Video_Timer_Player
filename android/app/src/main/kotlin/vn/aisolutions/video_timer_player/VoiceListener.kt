@@ -1,7 +1,9 @@
 package vn.aisolutions.video_timer_player
 
 import android.content.Context
+import android.media.AudioDeviceInfo
 import android.media.AudioFormat
+import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import org.json.JSONObject
@@ -55,10 +57,12 @@ class VoiceListener(private val ctx: Context, private val emit: (String, Any?) -
         running = true
         worker = thread(name = "voice-listener") {
             var record: AudioRecord? = null
-            var rec: Recognizer? = null
+            var rec: Recognizer? = null // limited to the command phrases
+            var free: Recognizer? = null // free dictation, only to show what was heard
             try {
                 prepare()
                 rec = Recognizer(model, 16000f, grammarJson)
+                free = Recognizer(model, 16000f)
                 val minBuf = AudioRecord.getMinBufferSize(16000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
                 record = AudioRecord(
                     MediaRecorder.AudioSource.VOICE_RECOGNITION, 16000,
@@ -68,8 +72,14 @@ class VoiceListener(private val ctx: Context, private val emit: (String, Any?) -
                     emit("error", "Không mở được micro (chưa cấp quyền hoặc micro đang bận).")
                     return@thread
                 }
+                // A speaker/headset on the 3.5 mm jack makes Android pick a headset mic that hears
+                // nothing: always use the phone's own microphone.
+                val am = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                val builtin = am.getDevices(AudioManager.GET_DEVICES_INPUTS).firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_MIC }
+                if (builtin != null) record.setPreferredDevice(builtin)
                 record.startRecording()
                 emit("status", "listening")
+                emit("device", builtin?.productName?.toString() ?: "micro mặc định")
                 val buf = ShortArray(1600) // 100 ms
                 val bytes = ByteArray(buf.size * 2)
                 var lastPartial = ""
@@ -84,12 +94,21 @@ class VoiceListener(private val ctx: Context, private val emit: (String, Any?) -
                     }
                     val rms = sqrt(sum / n) / 32768.0
                     emit("level", min(1.0, rms * 12)) // speech is usually well under full scale
+                    // Commands: the grammar-limited recogniser (reliable). "[unk]" means no command.
                     if (rec.acceptWaveForm(bytes, 2 * n)) {
-                        val text = JSONObject(rec.result).optString("text")
+                        val c = JSONObject(rec.result).optString("text")
+                        if (c.isNotBlank() && c != "[unk]") emit("cmd", c)
+                    } else {
+                        val c = JSONObject(rec.partialResult).optString("partial")
+                        if (c.isNotBlank() && c != "[unk]") emit("cmd", c)
+                    }
+                    // Display: free dictation of whatever was said.
+                    if (free.acceptWaveForm(bytes, 2 * n)) {
+                        val text = JSONObject(free.result).optString("text")
                         if (text.isNotBlank()) emit("final", text)
                         lastPartial = ""
                     } else {
-                        val p = JSONObject(rec.partialResult).optString("partial")
+                        val p = JSONObject(free.partialResult).optString("partial")
                         if (p.isNotBlank() && p != lastPartial) {
                             lastPartial = p
                             emit("partial", p)
@@ -102,6 +121,7 @@ class VoiceListener(private val ctx: Context, private val emit: (String, Any?) -
                 try { record?.stop() } catch (_: Throwable) {}
                 record?.release()
                 rec?.close()
+                free?.close()
                 running = false
             }
         }

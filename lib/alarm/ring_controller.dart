@@ -26,6 +26,9 @@ class RingController {
   StreamSubscription<AlarmSet>? _sub;
   Set<AlarmSettings> _ringing = {};
   bool _acted = false;
+  String _device = '';
+  String _partial = '';
+  final _heard = <String>[];
 
   RingController({required this.onSnooze, DateTime Function()? clock}) : _now = clock ?? DateTime.now;
 
@@ -65,6 +68,8 @@ class RingController {
       _acted = false;
       voiceStatus.value = '';
       voiceLevel.value = 0;
+      _heard.clear();
+      _partial = '';
       unawaited(_voice.stop().catchError((Object _) {}));
     } else if (wasEmpty) {
       _acted = false;
@@ -75,20 +80,36 @@ class RingController {
     }
   }
 
+  /// Shows what the recogniser hears: the last few finished sentences and the one in progress.
+  void _show(String header) {
+    final lines = [header, if (_device.isNotEmpty) 'Micro: $_device', ..._heard, if (_partial.isNotEmpty) '… $_partial'];
+    voiceStatus.value = lines.join('\n');
+  }
+
   void _onVoiceEvent(String event, Object? value) {
     if (_ringing.isEmpty) return;
     switch (event) {
       case 'status':
-        voiceStatus.value = value == 'listening' ? 'Đang nghe: nói "tắt chuông đi" hoặc "mười phút nữa báo lại"' : '$value';
+        _show(value == 'listening' ? 'Đang nghe. Nói "tắt chuông đi" hoặc "mười phút nữa báo lại"' : '$value');
+      case 'device':
+        _device = '$value';
+        _show('Đang nghe. Nói "tắt chuông đi" hoặc "mười phút nữa báo lại"');
       case 'level':
         voiceLevel.value = (value as num).toDouble();
       case 'partial':
+        _partial = '$value';
+        _show('Đang nghe...');
       case 'final':
-        final words = '$value';
-        voiceStatus.value = 'Nghe được: "$words"';
-        _handle(words);
+        _partial = '';
+        _heard.add('"$value"');
+        if (_heard.length > 3) _heard.removeAt(0);
+        _show('Đang nghe...');
+        _handle('$value');
+      case 'cmd':
+        // From the recogniser limited to the command phrases.
+        _handle('$value');
       case 'error':
-        voiceStatus.value = 'Giọng nói lỗi: $value';
+        _show('Giọng nói lỗi: $value');
     }
   }
 
@@ -100,10 +121,10 @@ class RingController {
     final alarm = _ringing.first;
     switch (cmd) {
       case StopCommand():
-        voiceStatus.value = 'Đã nghe "$words": tắt chuông';
+        voiceStatus.value = 'Đã nghe lệnh "$words": TẮT CHUÔNG';
         unawaited(Alarm.stop(alarm.id));
       case SnoozeCommand(:final delay):
-        voiceStatus.value = 'Đã nghe "$words": báo lại sau ${delay.inMinutes} phút';
+        voiceStatus.value = 'Đã nghe lệnh "$words": BÁO LẠI SAU ${delay.inMinutes} PHÚT';
         unawaited(onSnooze(alarm, delay));
     }
   }

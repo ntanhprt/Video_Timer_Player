@@ -113,7 +113,7 @@ class _RingingPageState extends State<RingingPage> {
                           child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                             _MicIcon(level: widget.voiceLevel, color: on),
                             const SizedBox(width: 6),
-                            Flexible(child: Text(v, textAlign: TextAlign.center, style: text.bodyMedium?.copyWith(color: on))),
+                            Flexible(child: Text(v, textAlign: TextAlign.start, maxLines: 6, overflow: TextOverflow.ellipsis, style: text.titleSmall?.copyWith(color: on))),
                           ]),
                         ),
                 ),
