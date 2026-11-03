@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
@@ -41,7 +42,9 @@ class AlarmEditPage extends StatefulWidget {
   final Future<String> Function(Alarm alarm, void Function(String) log)? onTest;
   /// Downloads the given links now, reporting steps to the log; returns a summary.
   final Future<String> Function(List<String> urls, void Function(String) log)? onDownload;
-  const AlarmEditPage({super.key, required this.repo, this.initial, this.onTest, this.onDownload});
+  /// Path of the downloaded audio for a link, or null when it is not on the phone yet.
+  final Future<String?> Function(String url)? cachedPath;
+  const AlarmEditPage({super.key, required this.repo, this.initial, this.onTest, this.onDownload, this.cachedPath});
 
   @override
   State<AlarmEditPage> createState() => _AlarmEditPageState();
@@ -54,6 +57,10 @@ class _AlarmEditPageState extends State<AlarmEditPage> {
   late VolumeSpec _volume;
   late OutputKind _output;
   late List<String> _files;
+
+  AudioPlayer? _player; // created on first preview
+  String? _playing; // key of the track being previewed
+  final _cachedFutures = <String, Future<String?>>{};
   List<String> _errors = const [];
 
   /// What the form looked like when it was opened or last saved, to tell unsaved edits.
@@ -81,6 +88,7 @@ class _AlarmEditPageState extends State<AlarmEditPage> {
 
   @override
   void dispose() {
+    _player?.dispose();
     _name.dispose();
     _url.dispose();
     super.dispose();
@@ -173,6 +181,115 @@ class _AlarmEditPageState extends State<AlarmEditPage> {
     setState(() => _errors = bad);
     if (bad.isNotEmpty) return;
     await _runWithLog('Tải nhạc YouTube', (log) => widget.onDownload!(urls, log));
+    if (mounted) setState(_cachedFutures.clear);
+  }
+
+  Future<String?> _cachedOf(String url) =>
+      _cachedFutures.putIfAbsent(url, () => widget.cachedPath?.call(url) ?? Future.value(null));
+
+  Future<void> _preview(String key, String path) async {
+    final player = _player ??= AudioPlayer()..onPlayerComplete.listen((_) => setState(() => _playing = null));
+    if (_playing == key) {
+      await player.stop();
+      setState(() => _playing = null);
+      return;
+    }
+    try {
+      await player.stop();
+      await player.play(DeviceFileSource(path));
+      setState(() => _playing = key);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Không phát thử được: $e')));
+    }
+  }
+
+  void _removeLink(String url) {
+    final rest = parseLinks(_url.text)..remove(url);
+    _url.text = rest.join('\n');
+    if (_playing == url) {
+      _player?.stop();
+      _playing = null;
+    }
+  }
+
+  void _removeFile(String f) {
+    setState(() => _files = [..._files]..remove(f));
+    if (_playing == f) {
+      _player?.stop();
+      _playing = null;
+    }
+  }
+
+  Widget _trackTile({required IconData icon, required String title, required String status, required String? playPath, required String key, VoidCallback? onDownload, required VoidCallback onRemove}) {
+    final playing = _playing == key;
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      dense: true,
+      leading: Icon(icon),
+      title: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis),
+      subtitle: Text(status),
+      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+        if (playPath != null)
+          IconButton(tooltip: playing ? 'Dừng' : 'Nghe thử', icon: Icon(playing ? Icons.stop_circle : Icons.play_circle), onPressed: () => _preview(key, playPath))
+        else if (onDownload != null)
+          IconButton(tooltip: 'Tải bài này', icon: const Icon(Icons.download), onPressed: onDownload),
+        IconButton(tooltip: 'Loại khỏi danh sách', icon: const Icon(Icons.delete_outline), onPressed: onRemove),
+      ]),
+    );
+  }
+
+  String _size(String path) {
+    try {
+      return '${(File(path).lengthSync() / 1048576).toStringAsFixed(1)} MB';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  Widget _trackList() {
+    final urls = parseLinks(_url.text);
+    final total = urls.length + _files.length;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('Danh sách nhạc báo thức ($total bài)', style: Theme.of(context).textTheme.titleSmall),
+      const Text('Mỗi lần kêu, app bốc ngẫu nhiên một bài trong danh sách (chỉ bài đã tải xong / file trong máy).', style: TextStyle(fontSize: 12)),
+      if (total == 0)
+        const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('Chưa có bài nào: sẽ phát nhạc dự phòng của app.')),
+      for (final u in urls)
+        FutureBuilder<String?>(
+          key: ValueKey('t$u'),
+          future: _cachedOf(u),
+          builder: (_, snap) {
+            final path = snap.data;
+            return _trackTile(
+              icon: Icons.smart_display,
+              title: u,
+              status: snap.connectionState != ConnectionState.done
+                  ? 'Đang kiểm tra...'
+                  : path != null
+                      ? 'YouTube • ĐÃ TẢI (${_size(path)}) — sẽ được dùng khi báo thức'
+                      : 'YouTube • CHƯA TẢI — bấm nút tải để lấy về máy',
+              playPath: path,
+              key: u,
+              onDownload: widget.onDownload == null
+                  ? null
+                  : () async {
+                      await _runWithLog('Tải bài này', (log) => widget.onDownload!([u], log));
+                      if (mounted) setState(() => _cachedFutures.remove(u));
+                    },
+              onRemove: () => _removeLink(u),
+            );
+          },
+        ),
+      for (final f in _files)
+        _trackTile(
+          icon: Icons.audio_file,
+          title: p.basename(f).replaceFirst(RegExp(r'^\d+_'), ''),
+          status: File(f).existsSync() ? 'File trong máy • ${_size(f)} — sẽ được dùng khi báo thức' : 'File không còn tồn tại',
+          playPath: File(f).existsSync() ? f : null,
+          key: f,
+          onRemove: () => _removeFile(f),
+        ),
+    ]);
   }
 
   Future<void> _pickFiles() async {
@@ -294,16 +411,8 @@ class _AlarmEditPageState extends State<AlarmEditPage> {
             icon: const Icon(Icons.folder_open),
             label: const Text('Chọn file nhạc trong máy (nhiều file)'),
           ),
-          Wrap(
-            spacing: 6,
-            children: [
-              for (final f in _files)
-                InputChip(
-                  label: Text(p.basename(f).replaceFirst(RegExp(r'^\d+_'), ''), overflow: TextOverflow.ellipsis),
-                  onDeleted: () => setState(() => _files = [..._files]..remove(f)),
-                ),
-            ],
-          ),
+          const SizedBox(height: 12),
+          _trackList(),
           const SizedBox(height: 16),
           if (schedule is Weekly) ...[
             ListTile(
