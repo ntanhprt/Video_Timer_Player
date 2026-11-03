@@ -31,6 +31,15 @@ void main() {
     });
   });
 
+  group('hold payload', () {
+    test('round trips; bad payloads give null', () {
+      expect(holdFromPayload(holdPayload(const Duration(minutes: 30))), const Duration(minutes: 30));
+      expect(holdFromPayload(null), isNull);
+      expect(holdFromPayload('nonsense'), isNull);
+      expect(holdFromPayload('{"holdSeconds":0}'), isNull);
+    });
+  });
+
   group('alarmIdFor', () {
     test('is stable, positive, fits 31 bits, and differs per occurrence', () {
       final ids = {for (var k = 0; k < 16; k++) alarmIdFor('abc', k)};

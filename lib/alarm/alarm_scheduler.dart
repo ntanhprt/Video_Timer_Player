@@ -103,6 +103,7 @@ class AlarmScheduler {
       id: id,
       dateTime: at,
       assetAudioPath: audio,
+      payload: holdPayload(a.volume.hold),
       loopAudio: true,
       vibrate: false,
       warningNotificationOnKill: false,

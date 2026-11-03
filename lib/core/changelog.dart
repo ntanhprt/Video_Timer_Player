@@ -4,6 +4,14 @@ typedef ChangelogEntry = ({String version, String date, List<String> changes});
 
 const changelog = <ChangelogEntry>[
   (
+    version: '0.4.0',
+    date: '03/11/2026',
+    changes: [
+      'Tự dừng báo thức khi hết "Phát tối đa" (ví dụ bài dài 1 tiếng nhưng đặt 30 phút thì 30 phút là dừng). Báo lại sau thì tính lại từ đầu.',
+      'Điều khiển bằng giọng nói khi chuông đang kêu: nói "tắt chuông đi" để tắt, "mười phút nữa báo lại" (hoặc "1 tiếng nữa báo lại", "nửa tiếng nữa báo lại") để báo lại. Cần cấp quyền micro và có mạng. Màn hình báo thức hiện câu app nghe được.',
+    ],
+  ),
+  (
     version: '0.3.1',
     date: '03/11/2026',
     changes: [

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:alarm/alarm.dart';
 import 'package:alarm/utils/alarm_set.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../alarm/plan.dart';
@@ -23,7 +24,10 @@ class RingingPage extends StatefulWidget {
   final VoidCallback onStop;
   final void Function(Duration) onSnooze;
   final DateTime Function()? clock;
-  const RingingPage({super.key, required this.alarm, required this.onStop, required this.onSnooze, this.clock});
+
+  /// What the microphone is doing / heard, shown under the buttons.
+  final ValueListenable<String>? voiceStatus;
+  const RingingPage({super.key, required this.alarm, required this.onStop, required this.onSnooze, this.clock, this.voiceStatus});
 
   @override
   State<RingingPage> createState() => _RingingPageState();
@@ -96,6 +100,20 @@ class _RingingPageState extends State<RingingPage> {
                   child: const FittedBox(child: Padding(padding: EdgeInsets.all(8), child: Text('TẮT', style: TextStyle(fontSize: 96, fontWeight: FontWeight.w900)))),
                 ),
               ),
+              if (widget.voiceStatus != null)
+                ValueListenableBuilder<String>(
+                  valueListenable: widget.voiceStatus!,
+                  builder: (_, v, _) => v.isEmpty
+                      ? const SizedBox.shrink()
+                      : Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                            Icon(Icons.mic, size: 18, color: on),
+                            const SizedBox(width: 6),
+                            Flexible(child: Text(v, textAlign: TextAlign.center, style: text.bodyMedium?.copyWith(color: on))),
+                          ]),
+                        ),
+                ),
               const SizedBox(height: 12),
               Text('BÁO LẠI SAU', textAlign: TextAlign.center, style: text.titleMedium?.copyWith(color: on, fontWeight: FontWeight.bold, letterSpacing: 2)),
               const SizedBox(height: 6),
@@ -152,7 +170,8 @@ Future<void> snooze(AlarmSettings ringing, Duration delay) async {
 /// Shows [RingingPage] over [child] whenever an alarm is ringing.
 class RingingOverlay extends StatelessWidget {
   final Widget child;
-  const RingingOverlay({super.key, required this.child});
+  final ValueListenable<String>? voiceStatus;
+  const RingingOverlay({super.key, required this.child, this.voiceStatus});
 
   @override
   Widget build(BuildContext context) {
@@ -170,6 +189,7 @@ class RingingOverlay extends StatelessWidget {
                   alarm: ringing.first,
                   onStop: () => Alarm.stop(ringing.first.id),
                   onSnooze: (d) => snooze(ringing.first, d),
+                  voiceStatus: voiceStatus,
                 ),
               ),
           ],

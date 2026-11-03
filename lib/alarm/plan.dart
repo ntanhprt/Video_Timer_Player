@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import '../core/volume_curve.dart';
 
 /// One step of the player-volume fade: from [time] on, play at [volume] (0..1 of the system volume).
@@ -52,4 +54,19 @@ String? pickTrack(List<String> tracks, String alarmId, DateTime at, {bool random
   }
   h = (h ^ (h >> 15)) * 0x2c1b3c6d & 0xffffffff;
   return tracks[h % tracks.length];
+}
+
+/// How long a ringing alarm may play, carried in the native alarm's payload so the app can stop
+/// it itself (the alarm plugin has no maximum duration).
+String holdPayload(Duration hold) => jsonEncode({'holdSeconds': hold.inSeconds});
+
+/// Inverse of [holdPayload]; null when the payload is missing or unreadable.
+Duration? holdFromPayload(String? payload) {
+  if (payload == null) return null;
+  try {
+    final s = (jsonDecode(payload) as Map<String, dynamic>)['holdSeconds'];
+    return s is int && s > 0 ? Duration(seconds: s) : null;
+  } catch (_) {
+    return null;
+  }
 }
