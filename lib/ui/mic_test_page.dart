@@ -33,7 +33,11 @@ class _MicTestPageState extends State<MicTestPage> {
     try {
       final d = await widget.ring.bridge.inputDevices();
       final s = await widget.ring.bridge.savedInputType();
-      if (mounted) setState(() => (_devices, _saved) = (d, s));
+      if (!mounted) return;
+      setState(() {
+        _devices = d;
+        _saved = s;
+      });
     } catch (e) {
       if (mounted) setState(() => _error = '$e');
     }
