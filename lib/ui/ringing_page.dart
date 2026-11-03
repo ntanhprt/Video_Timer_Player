@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui' show FontFeature;
 
 import 'package:alarm/alarm.dart';
 import 'package:alarm/utils/alarm_set.dart';
@@ -23,22 +22,23 @@ class RingingPage extends StatefulWidget {
   final AlarmSettings alarm;
   final VoidCallback onStop;
   final void Function(Duration) onSnooze;
-  final DateTime Function() clock;
-  RingingPage({super.key, required this.alarm, required this.onStop, required this.onSnooze, DateTime Function()? clock})
-      : clock = clock ?? DateTime.now;
+  final DateTime Function()? clock;
+  const RingingPage({super.key, required this.alarm, required this.onStop, required this.onSnooze, this.clock});
 
   @override
   State<RingingPage> createState() => _RingingPageState();
 }
 
 class _RingingPageState extends State<RingingPage> {
-  late DateTime _now = widget.clock();
+  late DateTime _now = _read();
+
+  DateTime _read() => (widget.clock ?? DateTime.now)();
   Timer? _tick;
 
   @override
   void initState() {
     super.initState();
-    _tick = Timer.periodic(const Duration(seconds: 1), (_) => setState(() => _now = widget.clock()));
+    _tick = Timer.periodic(const Duration(seconds: 1), (_) => setState(() => _now = _read()));
   }
 
   @override
