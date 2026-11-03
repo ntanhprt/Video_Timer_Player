@@ -4,7 +4,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:video_timer_player/tuya/tuya_client.dart';
-import 'package:video_timer_player/tuya/tuya_config.dart';
+import 'package:video_timer_player/tuya/tuya_models.dart';
 import 'package:video_timer_player/tuya/tuya_protocol.dart';
 
 const _key = '0123456789abcdef';
@@ -60,7 +60,7 @@ class FakePlug {
   }
 }
 
-TuyaConfig config(TuyaVersion v) => TuyaConfig(deviceId: 'abc123', ip: '127.0.0.1', localKey: _key, version: v);
+TuyaDevice config(TuyaVersion v) => TuyaDevice(id: 'd1', deviceId: 'abc123', ip: '127.0.0.1', localKey: _key, version: v);
 
 void main() {
   for (final v in TuyaVersion.values) {
@@ -110,19 +110,8 @@ void main() {
   });
 
   test('missing settings are reported without touching the network', () async {
-    final r = await TuyaClient().setSwitch(const TuyaConfig(), true);
+    final r = await TuyaClient().setSwitch(const TuyaDevice(id: 'x'), true);
     expect(r.ok, isFalse);
     expect(r.message, contains('Local key'));
-  });
-
-  test('config round-trips through its store', () async {
-    final dir = await Directory.systemTemp.createTemp('tuya');
-    final store = TuyaConfigStore(File('${dir.path}/t.json'));
-    expect((await store.load()).complete, isFalse);
-    final c = config(TuyaVersion.v34).copyWith(enabled: true, leadSeconds: 45, dp: '2');
-    await store.save(c);
-    final back = await store.load();
-    expect((back.deviceId, back.version, back.enabled, back.leadSeconds, back.dp), ('abc123', TuyaVersion.v34, true, 45, '2'));
-    await dir.delete(recursive: true);
   });
 }

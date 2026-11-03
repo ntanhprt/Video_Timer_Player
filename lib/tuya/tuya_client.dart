@@ -4,7 +4,7 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
-import 'tuya_config.dart';
+import 'tuya_models.dart';
 import 'tuya_protocol.dart';
 
 /// Outcome of a switch command.
@@ -87,7 +87,7 @@ class TuyaClient {
         _random = random ?? Random.secure();
 
   /// Switches the plug on or off. [log] receives each step, for the settings screen.
-  Future<TuyaResult> setSwitch(TuyaConfig c, bool on, {void Function(String)? log, int? portOverride}) async {
+  Future<TuyaResult> setSwitch(TuyaDevice c, bool on, {void Function(String)? log, int? portOverride}) async {
     final say = log ?? (_) {};
     if (!c.complete) return const TuyaResult(false, 'Chưa nhập đủ Device ID, IP và Local key (16 ký tự).');
     final key = utf8.encode(c.localKey);

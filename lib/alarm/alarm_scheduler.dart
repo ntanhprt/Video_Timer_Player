@@ -28,7 +28,10 @@ class AlarmScheduler {
   final _tried = <String>{};
   Future<void> _queue = Future.value();
 
-  AlarmScheduler(this.repo, this.cache, {DateTime Function()? clock}) : _now = clock ?? DateTime.now;
+  /// More native alarms to keep registered (the Tuya timers), by id.
+  final Map<int, AlarmSettings> Function(DateTime now)? extraAlarms;
+
+  AlarmScheduler(this.repo, this.cache, {DateTime Function()? clock, this.extraAlarms}) : _now = clock ?? DateTime.now;
 
   /// Registers the native alarms (serialised), then fetches any missing audio in the background.
   Future<void> sync() {
@@ -67,6 +70,7 @@ class AlarmScheduler {
         t = nextFire(a.schedule, t);
       }
     }
+    desired.addAll(extraAlarms?.call(now) ?? const {});
     ready.value = cached;
 
     final existing = await Alarm.getAlarms();

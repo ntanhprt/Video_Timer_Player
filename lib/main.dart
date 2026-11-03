@@ -11,8 +11,9 @@ import 'package:sqflite/sqflite.dart';
 import 'alarm/alarm_scheduler.dart';
 import 'alarm/commands/custom.dart';
 import 'alarm/ring_controller.dart';
+import 'alarm/tuya_alarms.dart';
 import 'tuya/tuya_client.dart';
-import 'tuya/tuya_config.dart';
+import 'tuya/tuya_hub.dart';
 import 'alarm/youtube_cache.dart';
 import 'data/alarm_repository.dart';
 import 'ui/alarm_list_page.dart';
@@ -22,15 +23,22 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Alarm.init();
   final repo = await SqliteAlarmRepository.open(p.join(await getDatabasesPath(), 'alarms.db'));
-  final scheduler = AlarmScheduler(repo, YoutubeCache());
+  final support = await getApplicationSupportDirectory();
+  final hub = TuyaHub(store: TuyaStore(File(p.join(support.path, 'tuya.json'))), client: TuyaClient());
+  await hub.load();
+  final scheduler = AlarmScheduler(repo, YoutubeCache(), extraAlarms: (now) => tuyaAlarms(hub.data.value, now));
   // Every edit re-registers the native alarms; so does coming back to the app.
   repo.watch().listen((_) => scheduler.sync());
+  hub.data.addListener(scheduler.sync);
   WidgetsBinding.instance.addObserver(_OnResume(scheduler.sync));
-  final support = await getApplicationSupportDirectory();
-  final ring = RingController(onSnooze: snooze, store: CustomCommandStore(File(p.join(support.path, 'voice_commands.json'))))..start();
-  final tuyaStore = TuyaConfigStore(File(p.join(support.path, 'tuya.json')));
-  final tuya = ValueNotifier<TuyaConfig>(await tuyaStore.load());
-  runApp(App(repo: repo, scheduler: scheduler, tuya: tuya, tuyaStore: tuyaStore, tuyaClient: TuyaClient(), voiceStatus: ring.voiceStatus, voiceLevel: ring.voiceLevel, ring: ring));
+  final ring = RingController(
+    onSnooze: snooze,
+    onTuya: (device, on) async {
+      await hub.runTimer(device, on);
+    },
+    store: CustomCommandStore(File(p.join(support.path, 'voice_commands.json'))),
+  )..start();
+  runApp(App(repo: repo, scheduler: scheduler, tuya: hub, voiceStatus: ring.voiceStatus, voiceLevel: ring.voiceLevel, ring: ring));
   _askPermissions();
 }
 
@@ -59,10 +67,8 @@ class App extends StatelessWidget {
   final ValueListenable<String>? voiceStatus;
   final ValueListenable<double>? voiceLevel;
   final RingController? ring;
-  final ValueNotifier<TuyaConfig>? tuya;
-  final TuyaConfigStore? tuyaStore;
-  final TuyaClient? tuyaClient;
-  const App({super.key, required this.repo, required this.scheduler, this.voiceStatus, this.voiceLevel, this.ring, this.tuya, this.tuyaStore, this.tuyaClient});
+  final TuyaHub? tuya;
+  const App({super.key, required this.repo, required this.scheduler, this.voiceStatus, this.voiceLevel, this.ring, this.tuya});
 
   @override
   Widget build(BuildContext context) {
@@ -71,7 +77,7 @@ class App extends StatelessWidget {
       theme: ThemeData(colorSchemeSeed: Colors.deepOrange, useMaterial3: true),
       darkTheme: ThemeData(colorSchemeSeed: Colors.deepOrange, useMaterial3: true, brightness: Brightness.dark),
       builder: (context, child) => RingingOverlay(voiceStatus: voiceStatus, voiceLevel: voiceLevel, child: child!),
-      home: AlarmListPage(repo: repo, scheduler: scheduler, ring: ring, tuya: tuya, tuyaStore: tuyaStore, tuyaClient: tuyaClient),
+      home: AlarmListPage(repo: repo, scheduler: scheduler, ring: ring, tuya: tuya),
     );
   }
 }

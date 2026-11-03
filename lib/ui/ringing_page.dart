@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../alarm/plan.dart';
+import '../alarm/tuya_alarms.dart';
 
 const snoozeChoices = [
   (label: '5 phút', minutes: 5),
@@ -210,7 +211,7 @@ class RingingOverlay extends StatelessWidget {
       stream: Alarm.ringing,
       initialData: Alarm.ringing.value,
       builder: (context, snap) {
-        final ringing = snap.data?.alarms ?? const <AlarmSettings>{};
+        final ringing = [for (final a in snap.data?.alarms ?? const <AlarmSettings>{}) if (tuyaFromPayload(a.payload) == null) a];
         return Stack(
           children: [
             child,

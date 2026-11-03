@@ -4,12 +4,13 @@ typedef ChangelogEntry = ({String version, String date, List<String> changes});
 
 const changelog = <ChangelogEntry>[
   (
-    version: '0.7.0',
+    version: '0.8.0',
     date: '03/11/2026',
     changes: [
-      'Trang chính có thẻ Tuya (logo cam): bấm vào để cài đặt ổ cắm thông minh: Device ID, IP, Local key, phiên bản giao thức 3.3 / 3.4, số công tắc, thời gian bật trước chuông, tắt khi chuông dừng.',
-      'Nút "Thử BẬT" / "Thử TẮT" kèm nhật ký từng bước. App điều khiển ổ cắm trực tiếp qua wifi nhà (giao thức Tuya LAN 3.3 và 3.4, kiểm tra từng byte với TinyTuya).',
-      'Chưa nối vào báo thức: bước tiếp theo là tự bật ổ cắm trước giờ chuông và tắt khi chuông dừng.',
+      'Tuya: danh sách thiết bị. Thêm nhiều ổ cắm, mỗi thiết bị có nút BẬT/TẮT nhanh và các hẹn giờ riêng (chọn giờ, bật hay tắt, các ngày trong tuần), giống app Tuya.',
+      'Hẹn giờ chạy đúng giờ kể cả khi app đang đóng (app tự thức dậy, thử lại 3 lần nếu wifi chưa sẵn sàng) và ghi lại "Hẹn giờ đã chạy gần đây". Đặt giờ BẬT sớm hơn báo thức để loa kịp khởi động.',
+      'Trang "Hướng dẫn kết nối Tuya" trong app: xem Device ID và IP trong app Tuya, lấy Local key ở iot.tuya.com hoặc bằng TinyTuya.',
+      'Giao thức Tuya LAN 3.3 và 3.4 (kiểm tra từng byte với TinyTuya). Đã bỏ cấu hình một ổ cắm của bản 0.7.0; dữ liệu cũ tự chuyển thành một thiết bị.',
     ],
   ),
   (

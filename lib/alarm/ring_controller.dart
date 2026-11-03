@@ -9,6 +9,7 @@ import 'commands/custom.dart';
 import 'commands/intent.dart';
 import 'commands/registry.dart';
 import 'plan.dart';
+import 'tuya_alarms.dart';
 import 'voice_bridge.dart';
 import 'voice_command.dart';
 
@@ -17,6 +18,10 @@ import 'voice_command.dart';
 class RingController {
   /// Called to snooze the given ringing alarm.
   final Future<void> Function(AlarmSettings alarm, Duration delay) onSnooze;
+
+  /// Runs a Tuya timer: switch the device with that app id on or off.
+  final Future<void> Function(String deviceId, bool on)? onTuya;
+  final _tuyaHandled = <int>{};
   final DateTime Function() _now;
 
   /// What the ringing screen shows about the microphone.
@@ -48,7 +53,7 @@ class RingController {
   /// Sentences heard but not understood: the user can teach one of them as a command.
   final unrecognized = ValueNotifier<List<String>>([]);
 
-  RingController({required this.onSnooze, this.store, DateTime Function()? clock}) : _now = clock ?? DateTime.now;
+  RingController({required this.onSnooze, this.onTuya, this.store, DateTime Function()? clock}) : _now = clock ?? DateTime.now;
 
   void start() {
     unawaited(_loadCustom());
@@ -94,7 +99,25 @@ class RingController {
     }
   }
 
-  void _onRinging(Set<AlarmSettings> ringing) {
+  void _onRinging(Set<AlarmSettings> all) {
+    // Helper alarms that only exist to wake the app for a Tuya timer: do the job, silence them,
+    // and keep them away from the alarm logic below.
+    final ringing = <AlarmSettings>{};
+    for (final a in all) {
+      final t = tuyaFromPayload(a.payload);
+      if (t == null) {
+        ringing.add(a);
+      } else if (_tuyaHandled.add(a.id)) {
+        unawaited(() async {
+          try {
+            await onTuya?.call(t.device, t.on);
+          } finally {
+            await Alarm.stop(a.id);
+          }
+        }());
+      }
+    }
+    _tuyaHandled.removeWhere((id) => !all.any((a) => a.id == id));
     final wasEmpty = _ringing.isEmpty;
     _ringing = ringing;
     final ids = ringing.map((a) => a.id).toSet();
