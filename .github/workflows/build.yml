@@ -45,13 +45,14 @@ jobs:
         run: |
           mkdir -p android/app/libs android/app/src/main/assets/model-vi
           curl -sSfL -o android/app/libs/sherpa-onnx-2.0.1.aar https://github.com/k2-fsa/sherpa-onnx/releases/download/v2.0.1/sherpa-onnx-2.0.1.aar
-          curl -sSfL -o "$RUNNER_TEMP/vi.tar.bz2" https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-zipformer-vi-int8-2025-04-20.tar.bz2
-          tar -xjf "$RUNNER_TEMP/vi.tar.bz2" -C "$RUNNER_TEMP"
-          m="$RUNNER_TEMP/sherpa-onnx-zipformer-vi-int8-2025-04-20"
-          cp "$m"/encoder-*.int8.onnx android/app/src/main/assets/model-vi/encoder.onnx
-          cp "$m"/decoder-*.onnx android/app/src/main/assets/model-vi/decoder.onnx
-          cp "$m"/joiner-*.int8.onnx android/app/src/main/assets/model-vi/joiner.onnx
-          cp "$m"/tokens.txt android/app/src/main/assets/model-vi/tokens.txt
+          # Gipformer 1.5 (68M Zipformer transducer, MIT, int8) from g-group-ai-lab
+          base=https://huggingface.co/g-group-ai-lab/gipformer1.5-68M-rnnt/resolve/main
+          for f in encoder.int8.onnx decoder.int8.onnx joiner.int8.onnx tokens.txt; do
+            curl -sSfL -o "android/app/src/main/assets/model-vi/$f" "$base/$f"
+          done
+          cd android/app/src/main/assets/model-vi
+          mv encoder.int8.onnx encoder.onnx; mv decoder.int8.onnx decoder.onnx; mv joiner.int8.onnx joiner.onnx
+          cd -
       - if: steps.chk.outputs.ok == 'true'
         run: flutter build apk --release --build-number=${{ github.run_number }}
       - uses: actions/upload-artifact@v4
