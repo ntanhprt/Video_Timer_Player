@@ -86,6 +86,7 @@ flutter {
 
 dependencies {
     implementation("io.github.junkfood02.youtubedl-android:library:0.18.1")
-    // Offline speech recognition for the "tắt chuông đi" voice commands.
-    implementation("com.alphacephei:vosk-android:0.3.75")
+    // Offline Vietnamese speech recognition (sherpa-onnx) for the voice commands; the AAR is
+    // downloaded by CI into android/app/libs, the model into assets/model-vi.
+    implementation(files("libs/sherpa-onnx-2.0.1.aar"))
 }

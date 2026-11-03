@@ -6,50 +6,48 @@ import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.MediaRecorder
-import org.json.JSONObject
-import org.vosk.Model
-import org.vosk.Recognizer
-import java.io.File
+import com.k2fsa.sherpa.onnx.FeatureConfig
+import com.k2fsa.sherpa.onnx.OfflineModelConfig
+import com.k2fsa.sherpa.onnx.OfflineRecognizer
+import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig
+import com.k2fsa.sherpa.onnx.OfflineTransducerModelConfig
 import kotlin.concurrent.thread
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
 
 /**
- * Offline speech recognition (Vosk, Vietnamese model bundled by the build) that listens to the
- * microphone and reports what it hears through [emit]: "status", "level" (0..1), "partial", "final".
+ * Offline Vietnamese speech recognition (sherpa-onnx, Zipformer model trained on ~70k hours,
+ * bundled by the build). Listens to the microphone, cuts the audio into utterances at pauses and
+ * reports through [emit]: "status", "device", "level" (0..1), "partial" and "final" (text), "error".
  * No Google services or network are needed.
  */
 class VoiceListener(private val ctx: Context, private val emit: (String, Any?) -> Unit) {
-    private var model: Model? = null
+    private var recognizer: OfflineRecognizer? = null
     private var worker: Thread? = null
 
     @Volatile private var running = false
 
-    /** Copies the model out of the APK assets once and loads it. */
+    /** Loads the model from the APK assets (a few seconds the first time). */
     @Synchronized
     fun prepare() {
-        if (model != null) return
-        val dir = File(ctx.filesDir, "vosk-model-vn")
-        val ok = File(dir, ".complete")
-        if (!ok.exists()) {
-            emit("status", "Đang chuẩn bị mô hình giọng nói (lần đầu)...")
-            dir.deleteRecursively()
-            copyAsset("model-vn", dir)
-            ok.writeText("ok")
-        }
-        model = Model(dir.absolutePath)
-    }
-
-    private fun copyAsset(path: String, dest: File) {
-        val children = ctx.assets.list(path) ?: emptyArray()
-        if (children.isEmpty()) {
-            dest.parentFile?.mkdirs()
-            ctx.assets.open(path).use { i -> dest.outputStream().use { o -> i.copyTo(o) } }
-        } else {
-            dest.mkdirs()
-            for (c in children) copyAsset("$path/$c", File(dest, c))
-        }
+        if (recognizer != null) return
+        emit("status", "Đang nạp mô hình giọng nói tiếng Việt...")
+        val dir = "model-vi"
+        val config = OfflineRecognizerConfig(
+            featConfig = FeatureConfig(sampleRate = 16000, featureDim = 80),
+            modelConfig = OfflineModelConfig(
+                transducer = OfflineTransducerModelConfig(
+                    encoder = "$dir/encoder.onnx",
+                    decoder = "$dir/decoder.onnx",
+                    joiner = "$dir/joiner.onnx",
+                ),
+                tokens = "$dir/tokens.txt",
+                numThreads = 2,
+            ),
+            decodingMethod = "greedy_search",
+        )
+        recognizer = OfflineRecognizer(ctx.assets, config)
     }
 
     private val am get() = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -67,11 +65,11 @@ class VoiceListener(private val ctx: Context, private val emit: (String, Any?) -
 
     private fun deviceLabel(d: AudioDeviceInfo) = "${typeName(d.type)} — ${d.productName}"
 
-    /** Input sources on the phone right now: [{id, label}]. */
+    /** Input sources on the phone right now: [{id, type, label}]. */
     fun inputDevices(): List<Map<String, Any>> =
         am.getDevices(AudioManager.GET_DEVICES_INPUTS).map { mapOf("id" to it.id, "type" to it.type, "label" to deviceLabel(it)) }
 
-    /** The saved choice (by type, since ids change), or null for "automatic = the phone's own mic". */
+    /** The saved choice (an AudioDeviceInfo type), or -1 for "automatic = the phone's own mic". */
     fun savedType(): Int = prefs.getInt("type", -1)
 
     fun saveChoice(type: Int) {
@@ -84,66 +82,110 @@ class VoiceListener(private val ctx: Context, private val emit: (String, Any?) -
         return all.firstOrNull { want != -1 && it.type == want } ?: all.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_MIC }
     }
 
-    fun start(grammarJson: String) {
+    private fun decode(rec: OfflineRecognizer, samples: FloatArray): String {
+        val stream = rec.createStream()
+        try {
+            stream.acceptWaveform(samples, 16000)
+            rec.decode(stream)
+            return rec.getResult(stream).text.trim()
+        } finally {
+            stream.release()
+        }
+    }
+
+    fun start() {
         if (running) return
         running = true
         worker = thread(name = "voice-listener") {
             var record: AudioRecord? = null
-            var rec: Recognizer? = null // limited to the command phrases
-            var free: Recognizer? = null // free dictation, only to show what was heard
             try {
                 prepare()
-                rec = Recognizer(model, 16000f, grammarJson)
-                free = Recognizer(model, 16000f)
+                val rec = recognizer!!
                 val minBuf = AudioRecord.getMinBufferSize(16000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
+                // Two seconds of buffer so a decode in progress never makes us drop audio.
                 record = AudioRecord(
                     MediaRecorder.AudioSource.VOICE_RECOGNITION, 16000,
-                    AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, max(minBuf, 8000),
+                    AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, max(minBuf, 64000),
                 )
                 if (record.state != AudioRecord.STATE_INITIALIZED) {
                     emit("error", "Không mở được micro (chưa cấp quyền hoặc micro đang bận).")
                     return@thread
                 }
                 // A speaker/headset on the 3.5 mm jack makes Android pick a headset mic that hears
-                // nothing: always use the phone's own microphone.
-                val builtin = chosenDevice()
-                if (builtin != null) record.setPreferredDevice(builtin)
+                // nothing, so the source is chosen explicitly (default: the phone's own microphone).
+                val device = chosenDevice()
+                if (device != null) record.setPreferredDevice(device)
                 record.startRecording()
                 emit("status", "listening")
-                emit("device", builtin?.let { deviceLabel(it) } ?: "micro mặc định")
-                val buf = ShortArray(1600) // 100 ms
-                val bytes = ByteArray(buf.size * 2)
-                var lastPartial = ""
+                emit("device", device?.let { deviceLabel(it) } ?: "micro mặc định")
+
+                val chunk = ShortArray(1600) // 100 ms
+                val preRoll = ArrayDeque<FloatArray>()
+                var segment = ArrayList<FloatArray>()
+                var inSpeech = false
+                var silent = 0
+                var chunks = 0
+                var floor = 0.005
+
+                fun flatten(parts: List<FloatArray>): FloatArray {
+                    val out = FloatArray(parts.sumOf { it.size })
+                    var o = 0
+                    for (p in parts) { p.copyInto(out, o); o += p.size }
+                    return out
+                }
+
+                fun finish() {
+                    // Drop the trailing silence, keep enough audio for the model to settle.
+                    val voiced = segment.size - max(0, silent - 2)
+                    if (voiced >= 4) {
+                        val text = decode(rec, flatten(segment))
+                        if (text.isNotBlank()) emit("final", text)
+                    }
+                    segment = ArrayList()
+                    inSpeech = false
+                    silent = 0
+                    chunks = 0
+                }
+
                 while (running) {
-                    val n = record.read(buf, 0, buf.size)
+                    val n = record.read(chunk, 0, chunk.size)
                     if (n <= 0) continue
+                    val f = FloatArray(n)
                     var sum = 0.0
                     for (i in 0 until n) {
-                        sum += buf[i].toDouble() * buf[i]
-                        bytes[2 * i] = (buf[i].toInt() and 0xff).toByte()
-                        bytes[2 * i + 1] = (buf[i].toInt() shr 8).toByte()
+                        f[i] = chunk[i] / 32768f
+                        sum += f[i].toDouble() * f[i]
                     }
-                    val rms = sqrt(sum / n) / 32768.0
-                    emit("level", min(1.0, rms * 12)) // speech is usually well under full scale
-                    // Commands: the grammar-limited recogniser (reliable). "[unk]" means no command.
-                    if (rec.acceptWaveForm(bytes, 2 * n)) {
-                        val c = JSONObject(rec.result).optString("text")
-                        if (c.isNotBlank() && c != "[unk]") emit("cmd", c)
-                    } else {
-                        val c = JSONObject(rec.partialResult).optString("partial")
-                        if (c.isNotBlank() && c != "[unk]") emit("cmd", c)
-                    }
-                    // Display: free dictation of whatever was said.
-                    if (free.acceptWaveForm(bytes, 2 * n)) {
-                        val text = JSONObject(free.result).optString("text")
-                        if (text.isNotBlank()) emit("final", text)
-                        lastPartial = ""
-                    } else {
-                        val p = JSONObject(free.partialResult).optString("partial")
-                        if (p.isNotBlank() && p != lastPartial) {
-                            lastPartial = p
-                            emit("partial", p)
+                    val rms = sqrt(sum / n)
+                    emit("level", min(1.0, rms * 12))
+
+                    val threshold = max(0.012, floor * 2.5)
+                    val loud = rms > threshold
+                    if (!loud) floor = floor * 0.95 + rms * 0.05 // follows the room, not the voice
+
+                    if (!inSpeech) {
+                        if (loud) {
+                            inSpeech = true
+                            segment.addAll(preRoll)
+                            segment.add(f)
+                            silent = 0
+                            chunks = 1
+                        } else {
+                            preRoll.addLast(f)
+                            if (preRoll.size > 3) preRoll.removeFirst()
                         }
+                        continue
+                    }
+                    segment.add(f)
+                    chunks++
+                    silent = if (loud) 0 else silent + 1
+                    if (silent >= 7 || segment.size >= 80) {
+                        finish()
+                        preRoll.clear()
+                    } else if (chunks % 10 == 0 && segment.size >= 5) {
+                        // A running guess so the user sees something while still talking.
+                        val text = decode(rec, flatten(segment))
+                        if (text.isNotBlank()) emit("partial", text)
                     }
                 }
             } catch (e: Throwable) {
@@ -151,8 +193,6 @@ class VoiceListener(private val ctx: Context, private val emit: (String, Any?) -
             } finally {
                 try { record?.stop() } catch (_: Throwable) {}
                 record?.release()
-                rec?.close()
-                free?.close()
                 running = false
             }
         }

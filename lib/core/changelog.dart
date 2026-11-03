@@ -4,6 +4,13 @@ typedef ChangelogEntry = ({String version, String date, List<String> changes});
 
 const changelog = <ChangelogEntry>[
   (
+    version: '0.5.0',
+    date: '03/11/2026',
+    changes: [
+      'Nhận dạng giọng nói tiếng Việt tốt hơn nhiều: đổi từ Vosk (mô hình nhỏ, sai nhiều) sang mô hình Zipformer huấn luyện trên ~70.000 giờ tiếng Việt (sherpa-onnx), vẫn chạy ngoại tuyến trong máy, có dấu đầy đủ. Hiểu câu nói tự do rồi mới tách lệnh "tắt chuông", "X phút nữa báo lại".',
+    ],
+  ),
+  (
     version: '0.4.3',
     date: '03/11/2026',
     changes: [

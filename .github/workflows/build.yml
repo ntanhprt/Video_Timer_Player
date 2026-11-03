@@ -40,13 +40,18 @@ jobs:
         env:
           # A zone with daylight saving, so the DST test in schedule_test.dart is meaningful.
           TZ: America/New_York
-      - name: Vosk Vietnamese speech model (offline voice commands; not stored in git)
+      - name: sherpa-onnx library and Vietnamese speech model (offline voice commands; not stored in git)
         if: steps.chk.outputs.ok == 'true'
         run: |
-          mkdir -p android/app/src/main/assets
-          curl -sSfL -o "$RUNNER_TEMP/vosk.zip" https://alphacephei.com/vosk/models/vosk-model-small-vn-0.4.zip
-          unzip -q "$RUNNER_TEMP/vosk.zip" -d "$RUNNER_TEMP/vosk"
-          mv "$RUNNER_TEMP"/vosk/vosk-model-small-vn-0.4 android/app/src/main/assets/model-vn
+          mkdir -p android/app/libs android/app/src/main/assets/model-vi
+          curl -sSfL -o android/app/libs/sherpa-onnx-2.0.1.aar https://github.com/k2-fsa/sherpa-onnx/releases/download/v2.0.1/sherpa-onnx-2.0.1.aar
+          curl -sSfL -o "$RUNNER_TEMP/vi.tar.bz2" https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-zipformer-vi-int8-2025-04-20.tar.bz2
+          tar -xjf "$RUNNER_TEMP/vi.tar.bz2" -C "$RUNNER_TEMP"
+          m="$RUNNER_TEMP/sherpa-onnx-zipformer-vi-int8-2025-04-20"
+          cp "$m"/encoder-*.int8.onnx android/app/src/main/assets/model-vi/encoder.onnx
+          cp "$m"/decoder-*.onnx android/app/src/main/assets/model-vi/decoder.onnx
+          cp "$m"/joiner-*.int8.onnx android/app/src/main/assets/model-vi/joiner.onnx
+          cp "$m"/tokens.txt android/app/src/main/assets/model-vi/tokens.txt
       - if: steps.chk.outputs.ok == 'true'
         run: flutter build apk --release --build-number=${{ github.run_number }}
       - uses: actions/upload-artifact@v4

@@ -27,7 +27,7 @@ class MainActivity : FlutterActivity() {
                 "prepare" -> thread {
                     try { voice.prepare() } catch (e: Throwable) { main.post { voiceChannel?.invokeMethod("error", e.message) } }
                 }
-                "start" -> voice.start(call.argument<String>("grammar") ?: "[]")
+                "start" -> voice.start()
                 "stop" -> voice.stop()
                 "inputDevices" -> return@setMethodCallHandler result.success(voice.inputDevices())
                 "savedInputType" -> return@setMethodCallHandler result.success(voice.savedType())
