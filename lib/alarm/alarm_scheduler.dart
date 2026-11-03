@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:alarm/alarm.dart';
 import 'package:flutter/foundation.dart';
@@ -54,6 +55,9 @@ class AlarmScheduler {
           cached.add(url);
           paths.add(path);
         }
+      }
+      for (final f in a.audioFiles) {
+        if (await File(f).exists()) paths.add(f);
       }
       var t = nextFire(a.schedule, now);
       for (var k = 0; k < occurrences && t != null; k++) {
@@ -119,34 +123,71 @@ class AlarmScheduler {
     );
   }
 
-  /// Rings [a] in [delay] with its real settings, downloading one of its tracks first.
-  /// Returns what to tell the user.
+  /// Downloads every link now, reporting each step to [log]. Returns a one-line summary.
+  Future<String> downloadNow(List<String> urls, {required void Function(String) log}) async {
+    final list = urls.where((u) => u.trim().isNotEmpty).toList();
+    if (list.isEmpty) return 'Chưa có link nào để tải.';
+    var ok = 0;
+    for (var i = 0; i < list.length; i++) {
+      final url = list[i];
+      log('[${i + 1}/${list.length}] $url');
+      if (await cache.cachedPath(url) != null) {
+        log('Đã có trong máy, bỏ qua.');
+        ok++;
+        continue;
+      }
+      final error = await cache.download(url, log: log);
+      if (error == null && await cache.cachedPath(url) != null) {
+        ok++;
+        ready.value = {...ready.value, url};
+        log('Xong.');
+      } else {
+        log('THẤT BẠI: ${error ?? 'không tạo được file'}');
+      }
+    }
+    unawaited(sync());
+    return 'Tải được $ok/${list.length} bài.';
+  }
+
+  /// Rings [a] in [delay] with its real settings, using one of its tracks (downloading it first
+  /// if needed). Returns what to tell the user.
   Future<String> testIn(model.Alarm a, Duration delay, {void Function(String)? log}) async {
     final say = log ?? (_) {};
-    var source = 'nhạc dự phòng (chưa nhập link)';
+    var source = 'nhạc dự phòng (chưa có bài nào)';
     var path = a.fallbackPath ?? fallbackAsset;
-    final urls = a.youtubeUrls.where((u) => u.trim().isNotEmpty).toList()..shuffle();
+    final urls = a.youtubeUrls.where((u) => u.trim().isNotEmpty).toList();
+    final candidates = <String>[...urls, ...a.audioFiles]..shuffle();
     final errors = <String>[];
-    say(urls.isEmpty ? 'Chưa có link YouTube: dùng nhạc dự phòng.' : 'Có ${urls.length} link, chọn ngẫu nhiên.');
-    for (final url in urls) {
-      say('Link: $url');
-      var cached = await cache.cachedPath(url);
+    say(candidates.isEmpty ? 'Chưa có link hay file nào: dùng nhạc dự phòng.' : 'Có ${urls.length} link + ${a.audioFiles.length} file, chọn ngẫu nhiên.');
+    for (final c in candidates) {
+      if (!urls.contains(c)) {
+        say('File trong máy: $c');
+        if (await File(c).exists()) {
+          path = c;
+          source = 'file trong máy';
+          break;
+        }
+        say('File không còn tồn tại, bỏ qua.');
+        continue;
+      }
+      say('Link: $c');
+      var cached = await cache.cachedPath(c);
       if (cached == null) {
         say('Chưa có trong máy, tải về...');
-        final error = await cache.download(url, log: say);
-        if (error != null) errors.add('$url -> $error');
-        cached = await cache.cachedPath(url);
+        final error = await cache.download(c, log: say);
+        if (error != null) errors.add('$c -> $error');
+        cached = await cache.cachedPath(c);
       }
       if (cached != null) {
         say('Đã có file âm thanh: $cached');
         path = cached;
-        source = 'bài YouTube đã tải ($url)';
-        ready.value = {...ready.value, url};
+        source = 'bài YouTube đã tải ($c)';
+        ready.value = {...ready.value, c};
         break;
       }
-      source = 'nhạc dự phòng vì không tải được YouTube';
+      source = 'nhạc dự phòng vì không tải được';
     }
-    say('Hẹn giờ kêu sau ${delay.inSeconds} giây (${path == fallbackAsset ? 'nhạc dự phòng' : 'file YouTube'})...');
+    say('Hẹn giờ kêu sau ${delay.inSeconds} giây (${path == fallbackAsset ? 'nhạc dự phòng' : source})...');
     await Alarm.set(alarmSettings: _settings(a, testAlarmId, _now().add(delay), path));
     final detail = errors.isEmpty ? '' : '\nLỗi: ${errors.join('\n')}';
     return 'Sẽ kêu sau ${delay.inSeconds} giây bằng $source.$detail';

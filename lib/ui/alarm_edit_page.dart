@@ -1,7 +1,11 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 import '../core/alarm.dart';
 import '../core/schedule.dart';
@@ -35,7 +39,9 @@ class AlarmEditPage extends StatefulWidget {
 
   /// Rings the alarm shortly so it can be tried now; returns a message for the user.
   final Future<String> Function(Alarm alarm, void Function(String) log)? onTest;
-  const AlarmEditPage({super.key, required this.repo, this.initial, this.onTest});
+  /// Downloads the given links now, reporting steps to the log; returns a summary.
+  final Future<String> Function(List<String> urls, void Function(String) log)? onDownload;
+  const AlarmEditPage({super.key, required this.repo, this.initial, this.onTest, this.onDownload});
 
   @override
   State<AlarmEditPage> createState() => _AlarmEditPageState();
@@ -47,12 +53,13 @@ class _AlarmEditPageState extends State<AlarmEditPage> {
   late ScheduleSpec _schedule;
   late VolumeSpec _volume;
   late OutputKind _output;
+  late List<String> _files;
   List<String> _errors = const [];
 
   /// What the form looked like when it was opened or last saved, to tell unsaved edits.
   late String _baseline;
 
-  String _snapshot() => jsonEncode([_name.text, parseLinks(_url.text), _schedule.toJson(), _volume.toJson(), _output.name]);
+  String _snapshot() => jsonEncode([_name.text, parseLinks(_url.text), _files, _schedule.toJson(), _volume.toJson(), _output.name]);
   bool get _dirty => _snapshot() != _baseline;
 
   @override
@@ -64,6 +71,7 @@ class _AlarmEditPageState extends State<AlarmEditPage> {
     _schedule = a?.schedule ?? const Weekly(TimeOfDayMin(6, 30), {1, 2, 3, 4, 5});
     _volume = a?.volume ?? const VolumeSpec();
     _output = a?.output ?? OutputKind.anyConnected;
+    _files = [...?a?.audioFiles];
     _baseline = _snapshot();
     _name.addListener(_refresh);
     _url.addListener(_refresh);
@@ -85,6 +93,7 @@ class _AlarmEditPageState extends State<AlarmEditPage> {
       name: _name.text.trim().isEmpty ? 'Báo thức' : _name.text.trim(),
       schedule: _schedule,
       youtubeUrls: parseLinks(_url.text),
+      audioFiles: _files,
       volume: _volume,
       output: _output,
       fallbackPath: a?.fallbackPath,
@@ -105,11 +114,8 @@ class _AlarmEditPageState extends State<AlarmEditPage> {
     Navigator.of(context).maybePop();
   }
 
-  Future<void> _test() async {
-    final alarm = _build();
-    final errors = validate(alarm);
-    setState(() => _errors = errors);
-    if (errors.isNotEmpty) return;
+  /// Shows a dialog that fills with the steps of [task] as it runs.
+  Future<void> _runWithLog(String title, Future<String> Function(void Function(String) log) task) async {
     final lines = ValueNotifier<List<String>>([]);
     final done = ValueNotifier<bool>(false);
     void log(String m) {
@@ -122,7 +128,7 @@ class _AlarmEditPageState extends State<AlarmEditPage> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: const Text('Thử báo thức'),
+        title: Text(title),
         content: SizedBox(
           width: double.maxFinite,
           child: ValueListenableBuilder<List<String>>(
@@ -143,15 +149,47 @@ class _AlarmEditPageState extends State<AlarmEditPage> {
         ],
       ),
     );
-    log('Bắt đầu thử.');
+    log('Bắt đầu.');
     try {
-      final msg = await widget.onTest!(alarm, log);
-      log('Kết quả: $msg');
+      log('Kết quả: ${await task(log)}');
     } catch (e) {
       log('LỖI: $e');
     }
     done.value = true;
     await dialog;
+  }
+
+  Future<void> _test() async {
+    final alarm = _build();
+    final errors = validate(alarm);
+    setState(() => _errors = errors);
+    if (errors.isNotEmpty) return;
+    await _runWithLog('Thử báo thức', (log) => widget.onTest!(alarm, log));
+  }
+
+  Future<void> _downloadNow() async {
+    final urls = parseLinks(_url.text);
+    final bad = validate(_build());
+    setState(() => _errors = bad);
+    if (bad.isNotEmpty) return;
+    await _runWithLog('Tải nhạc YouTube', (log) => widget.onDownload!(urls, log));
+  }
+
+  Future<void> _pickFiles() async {
+    final picked = await FilePicker.platform.pickFiles(type: FileType.audio, allowMultiple: true);
+    if (picked == null) return;
+    final dir = Directory(p.join((await getApplicationSupportDirectory()).path, 'music'));
+    await dir.create(recursive: true);
+    final added = <String>[];
+    for (final f in picked.files) {
+      final src = f.path;
+      if (src == null) continue;
+      // Copy so the alarm still works if the original is moved or the picker cache is cleared.
+      final dest = File(p.join(dir.path, '${DateTime.now().microsecondsSinceEpoch}_${p.basename(src)}'));
+      await File(src).copy(dest.path);
+      added.add(dest.path);
+    }
+    if (mounted) setState(() => _files = [..._files, ...added]);
   }
 
   Future<void> _confirmLeave() async {
@@ -238,6 +276,33 @@ class _AlarmEditPageState extends State<AlarmEditPage> {
               helperText: 'Mỗi lần kêu phát ngẫu nhiên một bài. Để trống: phát nhạc dự phòng',
               alignLabelWithHint: true,
             ),
+          ),
+          if (widget.onDownload != null)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                key: const Key('downloadNow'),
+                onPressed: _downloadNow,
+                icon: const Icon(Icons.download),
+                label: const Text('Tải ngay'),
+              ),
+            ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            key: const Key('pickFiles'),
+            onPressed: _pickFiles,
+            icon: const Icon(Icons.folder_open),
+            label: const Text('Chọn file nhạc trong máy (nhiều file)'),
+          ),
+          Wrap(
+            spacing: 6,
+            children: [
+              for (final f in _files)
+                InputChip(
+                  label: Text(p.basename(f).replaceFirst(RegExp(r'^\d+_'), ''), overflow: TextOverflow.ellipsis),
+                  onDeleted: () => setState(() => _files = [..._files]..remove(f)),
+                ),
+            ],
           ),
           const SizedBox(height: 16),
           if (schedule is Weekly) ...[

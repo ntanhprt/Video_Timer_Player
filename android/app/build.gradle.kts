@@ -56,6 +56,9 @@ android {
 
     buildTypes {
         release {
+            // R8 renames/strips what youtubedl-android loads by reflection, so yt-dlp crashed.
+            isMinifyEnabled = false
+            isShrinkResources = false
             // Stable key from CI secrets; falls back to debug key when key.properties is absent.
             signingConfig = if (keyProps.isNotEmpty()) signingConfigs.getByName("release")
                             else signingConfigs.getByName("debug")

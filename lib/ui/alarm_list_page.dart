@@ -25,11 +25,12 @@ class AlarmListPage extends StatelessWidget {
   const AlarmListPage({super.key, required this.repo, required this.scheduler});
 
   void _open(BuildContext context, [Alarm? a]) => Navigator.of(context).push(MaterialPageRoute<void>(
-      builder: (_) => AlarmEditPage(repo: repo, initial: a, onTest: (alarm, log) => scheduler.testIn(alarm, const Duration(seconds: 10), log: log))));
+      builder: (_) => AlarmEditPage(repo: repo, initial: a, onTest: (alarm, log) => scheduler.testIn(alarm, const Duration(seconds: 10), log: log),
+          onDownload: (urls, log) => scheduler.downloadNow(urls, log: log))));
 
   String _music(Alarm a, Set<String> ready) {
     final urls = a.youtubeUrls.where((u) => u.trim().isNotEmpty).toList();
-    if (urls.isEmpty) return 'nhạc dự phòng';
+    if (urls.isEmpty) return a.audioFiles.isEmpty ? 'nhạc dự phòng' : 'nhạc: ${a.audioFiles.length} file trong máy';
     final done = urls.where(ready.contains).length;
     return done == urls.length
         ? 'nhạc YouTube: đã tải $done/${urls.length} bài (mỗi lần kêu một bài ngẫu nhiên)'
