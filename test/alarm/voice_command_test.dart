@@ -4,6 +4,7 @@ import 'package:video_timer_player/alarm/voice_command.dart';
 SnoozeCommand snooze(int minutes) => SnoozeCommand(Duration(minutes: minutes));
 
 void main() {
+  grammarTests();
   test('stop phrases', () {
     for (final s in ['tắt chuông đi', 'Tắt báo thức', 'tắt nhạc đi', 'dừng lại', 'im đi', 'thôi đi', 'tat chuong di']) {
       expect(parseVoiceCommand(s), const StopCommand(), reason: s);
@@ -48,5 +49,31 @@ void main() {
     for (final s in ['', 'xin chào', 'hôm nay trời đẹp', 'tắt', 'bật đèn lên']) {
       expect(parseVoiceCommand(s), isNull, reason: s);
     }
+  });
+}
+
+void grammarTests() {
+  group('voice grammar', () {
+    test('viNumber speaks Vietnamese numbers', () {
+      expect(viNumber(5), 'năm');
+      expect(viNumber(10), 'mười');
+      expect(viNumber(15), 'mười lăm');
+      expect(viNumber(21), 'hai mươi mốt');
+      expect(viNumber(25), 'hai mươi lăm');
+      expect(viNumber(45), 'bốn mươi lăm');
+    });
+
+    test('every spoken snooze phrase parses back to the same minutes', () {
+      for (final m in voiceSnoozeMinutes) {
+        expect(parseVoiceCommand('${viNumber(m)} phút nữa báo lại'), snooze(m), reason: '$m');
+        expect(parseVoiceCommand('báo lại sau ${viNumber(m)} phút'), snooze(m), reason: '$m');
+      }
+    });
+
+    test('every phrase in the grammar is understood', () {
+      for (final p in voicePhrases()) {
+        expect(parseVoiceCommand(p), isNotNull, reason: p);
+      }
+    });
   });
 }

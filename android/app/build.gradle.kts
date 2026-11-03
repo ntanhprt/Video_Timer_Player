@@ -86,4 +86,6 @@ flutter {
 
 dependencies {
     implementation("io.github.junkfood02.youtubedl-android:library:0.18.1")
+    // Offline speech recognition for the "tắt chuông đi" voice commands.
+    implementation("com.alphacephei:vosk-android:0.3.75")
 }

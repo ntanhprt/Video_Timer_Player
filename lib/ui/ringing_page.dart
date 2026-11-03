@@ -27,7 +27,10 @@ class RingingPage extends StatefulWidget {
 
   /// What the microphone is doing / heard, shown under the buttons.
   final ValueListenable<String>? voiceStatus;
-  const RingingPage({super.key, required this.alarm, required this.onStop, required this.onSnooze, this.clock, this.voiceStatus});
+
+  /// Microphone loudness 0..1: the mic icon pulses with it so the user can see they are heard.
+  final ValueListenable<double>? voiceLevel;
+  const RingingPage({super.key, required this.alarm, required this.onStop, required this.onSnooze, this.clock, this.voiceStatus, this.voiceLevel});
 
   @override
   State<RingingPage> createState() => _RingingPageState();
@@ -108,7 +111,7 @@ class _RingingPageState extends State<RingingPage> {
                       : Padding(
                           padding: const EdgeInsets.only(top: 8),
                           child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                            Icon(Icons.mic, size: 18, color: on),
+                            _MicIcon(level: widget.voiceLevel, color: on),
                             const SizedBox(width: 6),
                             Flexible(child: Text(v, textAlign: TextAlign.center, style: text.bodyMedium?.copyWith(color: on))),
                           ]),
@@ -161,6 +164,33 @@ class _RingingPageState extends State<RingingPage> {
   }
 }
 
+/// Microphone icon whose halo grows with the loudness of the voice.
+class _MicIcon extends StatelessWidget {
+  final ValueListenable<double>? level;
+  final Color color;
+  const _MicIcon({required this.level, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 56,
+      height: 56,
+      child: ValueListenableBuilder<double>(
+        valueListenable: level ?? ValueNotifier<double>(0),
+        builder: (_, v, _) => Stack(alignment: Alignment.center, children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 100),
+            width: 24 + 32 * v.clamp(0.0, 1.0),
+            height: 24 + 32 * v.clamp(0.0, 1.0),
+            decoration: BoxDecoration(shape: BoxShape.circle, color: color.withValues(alpha: 0.15 + 0.35 * v.clamp(0.0, 1.0))),
+          ),
+          Icon(Icons.mic, size: 24, color: color),
+        ]),
+      ),
+    );
+  }
+}
+
 /// Stops the ringing alarm and rings it again in [delay], with the same sound and volume ramp.
 Future<void> snooze(AlarmSettings ringing, Duration delay) async {
   await Alarm.stop(ringing.id);
@@ -171,7 +201,8 @@ Future<void> snooze(AlarmSettings ringing, Duration delay) async {
 class RingingOverlay extends StatelessWidget {
   final Widget child;
   final ValueListenable<String>? voiceStatus;
-  const RingingOverlay({super.key, required this.child, this.voiceStatus});
+  final ValueListenable<double>? voiceLevel;
+  const RingingOverlay({super.key, required this.child, this.voiceStatus, this.voiceLevel});
 
   @override
   Widget build(BuildContext context) {
@@ -190,6 +221,7 @@ class RingingOverlay extends StatelessWidget {
                   onStop: () => Alarm.stop(ringing.first.id),
                   onSnooze: (d) => snooze(ringing.first, d),
                   voiceStatus: voiceStatus,
+                  voiceLevel: voiceLevel,
                 ),
               ),
           ],

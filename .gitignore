@@ -17,3 +17,6 @@ web/config.local.php
 *.sqlite-shm
 # scratch
 build_out/
+
+# downloaded by CI
+android/app/src/main/assets/model-vn/

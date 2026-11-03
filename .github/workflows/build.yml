@@ -40,6 +40,13 @@ jobs:
         env:
           # A zone with daylight saving, so the DST test in schedule_test.dart is meaningful.
           TZ: America/New_York
+      - name: Vosk Vietnamese speech model (offline voice commands; not stored in git)
+        if: steps.chk.outputs.ok == 'true'
+        run: |
+          mkdir -p android/app/src/main/assets
+          curl -sSfL -o "$RUNNER_TEMP/vosk.zip" https://alphacephei.com/vosk/models/vosk-model-small-vn-0.4.zip
+          unzip -q "$RUNNER_TEMP/vosk.zip" -d "$RUNNER_TEMP/vosk"
+          mv "$RUNNER_TEMP"/vosk/vosk-model-small-vn-0.4 android/app/src/main/assets/model-vn
       - if: steps.chk.outputs.ok == 'true'
         run: flutter build apk --release --build-number=${{ github.run_number }}
       - uses: actions/upload-artifact@v4

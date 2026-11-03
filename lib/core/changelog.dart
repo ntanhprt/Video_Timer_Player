@@ -8,7 +8,7 @@ const changelog = <ChangelogEntry>[
     date: '03/11/2026',
     changes: [
       'Tự dừng báo thức khi hết "Phát tối đa" (ví dụ bài dài 1 tiếng nhưng đặt 30 phút thì 30 phút là dừng). Báo lại sau thì tính lại từ đầu.',
-      'Điều khiển bằng giọng nói khi chuông đang kêu: nói "tắt chuông đi" để tắt, "mười phút nữa báo lại" (hoặc "1 tiếng nữa báo lại", "nửa tiếng nữa báo lại") để báo lại. Cần cấp quyền micro và có mạng. Màn hình báo thức hiện câu app nghe được.',
+      'Điều khiển bằng giọng nói khi chuông đang kêu, nhận dạng NGOẠI TUYẾN trong máy (Vosk, không cần Google hay mạng): nói "tắt chuông đi" để tắt, "mười phút nữa báo lại" (hoặc "một tiếng nữa báo lại", "nửa tiếng nữa báo lại") để báo lại. Cần cấp quyền micro. Màn hình báo thức có biểu tượng micro nhấp nháy theo tiếng nói và hiện câu app nghe được.',
     ],
   ),
   (

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 /// What the user said to a ringing alarm.
 sealed class VoiceCommand {
   const VoiceCommand();
@@ -124,3 +126,35 @@ VoiceCommand? parseVoiceCommand(String text) {
   if (_hasPhrase(folded, stopPhrases)) return const StopCommand();
   return null;
 }
+
+const _words = ['', 'một', 'hai', 'ba', 'bốn', 'năm', 'sáu', 'bảy', 'tám', 'chín'];
+
+/// 1..59 in spoken Vietnamese: 5 → "năm", 15 → "mười lăm", 25 → "hai mươi lăm".
+String viNumber(int n) {
+  assert(n >= 1 && n < 60);
+  if (n < 10) return _words[n];
+  final tens = n ~/ 10, u = n % 10;
+  final tail = u == 0 ? '' : u == 5 ? 'lăm' : (u == 1 && tens > 1) ? 'mốt' : _words[u];
+  final head = tens == 1 ? 'mười' : '${_words[tens]} mươi';
+  return tail.isEmpty ? head : '$head $tail';
+}
+
+/// Minutes offered as spoken snooze times.
+const voiceSnoozeMinutes = [1, 2, 3, 5, 10, 15, 20, 25, 30, 40, 45, 50, 55];
+
+const _stopPhrasesSpoken = ['tắt chuông đi', 'tắt báo thức', 'tắt nhạc đi', 'tắt đi', 'dừng lại', 'im đi', 'thôi đi'];
+
+/// Every sentence the recogniser may produce. Limiting it to these makes recognition far more
+/// reliable than free dictation, especially with music playing.
+List<String> voicePhrases() => [
+      ..._stopPhrasesSpoken,
+      'báo lại',
+      for (final m in voiceSnoozeMinutes) ...['${viNumber(m)} phút nữa báo lại', 'báo lại sau ${viNumber(m)} phút'],
+      'một tiếng nữa báo lại',
+      'hai tiếng nữa báo lại',
+      'một tiếng rưỡi nữa báo lại',
+      'nửa tiếng nữa báo lại',
+    ];
+
+/// JSON grammar for the recogniser: the phrases plus "[unk]" for everything else.
+String voiceGrammar() => jsonEncode([...voicePhrases(), '[unk]']);

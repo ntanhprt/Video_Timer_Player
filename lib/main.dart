@@ -21,7 +21,7 @@ Future<void> main() async {
   repo.watch().listen((_) => scheduler.sync());
   WidgetsBinding.instance.addObserver(_OnResume(scheduler.sync));
   final ring = RingController(onSnooze: snooze)..start();
-  runApp(App(repo: repo, scheduler: scheduler, voiceStatus: ring.voiceStatus));
+  runApp(App(repo: repo, scheduler: scheduler, voiceStatus: ring.voiceStatus, voiceLevel: ring.voiceLevel));
   _askPermissions();
 }
 
@@ -48,7 +48,8 @@ class App extends StatelessWidget {
   final AlarmRepository repo;
   final AlarmScheduler scheduler;
   final ValueListenable<String>? voiceStatus;
-  const App({super.key, required this.repo, required this.scheduler, this.voiceStatus});
+  final ValueListenable<double>? voiceLevel;
+  const App({super.key, required this.repo, required this.scheduler, this.voiceStatus, this.voiceLevel});
 
   @override
   Widget build(BuildContext context) {
@@ -56,7 +57,7 @@ class App extends StatelessWidget {
       title: 'Đánh thức',
       theme: ThemeData(colorSchemeSeed: Colors.deepOrange, useMaterial3: true),
       darkTheme: ThemeData(colorSchemeSeed: Colors.deepOrange, useMaterial3: true, brightness: Brightness.dark),
-      builder: (context, child) => RingingOverlay(voiceStatus: voiceStatus, child: child!),
+      builder: (context, child) => RingingOverlay(voiceStatus: voiceStatus, voiceLevel: voiceLevel, child: child!),
       home: AlarmListPage(repo: repo, scheduler: scheduler),
     );
   }

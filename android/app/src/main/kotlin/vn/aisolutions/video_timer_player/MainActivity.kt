@@ -14,11 +14,25 @@ import kotlin.concurrent.thread
 class MainActivity : FlutterActivity() {
     private val main = Handler(Looper.getMainLooper())
     private var channel: MethodChannel? = null
+    private var voiceChannel: MethodChannel? = null
+    private val voice = VoiceListener(this) { event, value -> main.post { voiceChannel?.invokeMethod(event, value) } }
 
     private fun log(msg: String) = main.post { channel?.invokeMethod("log", msg) }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        voiceChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "vn.aisolutions/voice")
+        voiceChannel!!.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "prepare" -> thread {
+                    try { voice.prepare() } catch (e: Throwable) { main.post { voiceChannel?.invokeMethod("error", e.message) } }
+                }
+                "start" -> voice.start(call.argument<String>("grammar") ?: "[]")
+                "stop" -> voice.stop()
+                else -> return@setMethodCallHandler result.notImplemented()
+            }
+            result.success(null)
+        }
         channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "vn.aisolutions/ytdlp")
         channel!!.setMethodCallHandler { call, result ->
                 if (call.method != "download") return@setMethodCallHandler result.notImplemented()
