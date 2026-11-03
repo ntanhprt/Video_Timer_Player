@@ -121,19 +121,24 @@ class AlarmScheduler {
 
   /// Rings [a] in [delay] with its real settings, downloading one of its tracks first.
   /// Returns what to tell the user.
-  Future<String> testIn(model.Alarm a, Duration delay) async {
+  Future<String> testIn(model.Alarm a, Duration delay, {void Function(String)? log}) async {
+    final say = log ?? (_) {};
     var source = 'nhạc dự phòng (chưa nhập link)';
     var path = a.fallbackPath ?? fallbackAsset;
     final urls = a.youtubeUrls.where((u) => u.trim().isNotEmpty).toList()..shuffle();
     final errors = <String>[];
+    say(urls.isEmpty ? 'Chưa có link YouTube: dùng nhạc dự phòng.' : 'Có ${urls.length} link, chọn ngẫu nhiên.');
     for (final url in urls) {
+      say('Link: $url');
       var cached = await cache.cachedPath(url);
       if (cached == null) {
-        final error = await cache.download(url);
+        say('Chưa có trong máy, tải về...');
+        final error = await cache.download(url, log: say);
         if (error != null) errors.add('$url -> $error');
         cached = await cache.cachedPath(url);
       }
       if (cached != null) {
+        say('Đã có file âm thanh: $cached');
         path = cached;
         source = 'bài YouTube đã tải ($url)';
         ready.value = {...ready.value, url};
@@ -141,6 +146,7 @@ class AlarmScheduler {
       }
       source = 'nhạc dự phòng vì không tải được YouTube';
     }
+    say('Hẹn giờ kêu sau ${delay.inSeconds} giây (${path == fallbackAsset ? 'nhạc dự phòng' : 'file YouTube'})...');
     await Alarm.set(alarmSettings: _settings(a, testAlarmId, _now().add(delay), path));
     final detail = errors.isEmpty ? '' : '\nLỗi: ${errors.join('\n')}';
     return 'Sẽ kêu sau ${delay.inSeconds} giây bằng $source.$detail';

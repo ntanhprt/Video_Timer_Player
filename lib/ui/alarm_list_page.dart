@@ -25,7 +25,7 @@ class AlarmListPage extends StatelessWidget {
   const AlarmListPage({super.key, required this.repo, required this.scheduler});
 
   void _open(BuildContext context, [Alarm? a]) => Navigator.of(context).push(MaterialPageRoute<void>(
-      builder: (_) => AlarmEditPage(repo: repo, initial: a, onTest: (alarm) => scheduler.testIn(alarm, const Duration(seconds: 10)))));
+      builder: (_) => AlarmEditPage(repo: repo, initial: a, onTest: (alarm, log) => scheduler.testIn(alarm, const Duration(seconds: 10), log: log))));
 
   String _music(Alarm a, Set<String> ready) {
     final urls = a.youtubeUrls.where((u) => u.trim().isNotEmpty).toList();

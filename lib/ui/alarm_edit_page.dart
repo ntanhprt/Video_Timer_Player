@@ -34,7 +34,7 @@ class AlarmEditPage extends StatefulWidget {
   final Alarm? initial;
 
   /// Rings the alarm shortly so it can be tried now; returns a message for the user.
-  final Future<String> Function(Alarm alarm)? onTest;
+  final Future<String> Function(Alarm alarm, void Function(String) log)? onTest;
   const AlarmEditPage({super.key, required this.repo, this.initial, this.onTest});
 
   @override
@@ -110,19 +110,48 @@ class _AlarmEditPageState extends State<AlarmEditPage> {
     final errors = validate(alarm);
     setState(() => _errors = errors);
     if (errors.isNotEmpty) return;
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.showSnackBar(const SnackBar(content: Text('Đang chuẩn bị... (tải nhạc có thể mất vài chục giây)')));
-    final msg = await widget.onTest!(alarm);
-    messenger.hideCurrentSnackBar();
-    if (!mounted) return;
-    await showDialog<void>(
+    final lines = ValueNotifier<List<String>>([]);
+    final done = ValueNotifier<bool>(false);
+    void log(String m) {
+      final t = DateTime.now();
+      final stamp = '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}:${t.second.toString().padLeft(2, '0')}';
+      lines.value = [...lines.value, '$stamp  $m'];
+    }
+
+    final dialog = showDialog<void>(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         title: const Text('Thử báo thức'),
-        content: SingleChildScrollView(child: SelectableText('$msg\n\nKhóa màn hình để thử.')),
-        actions: [TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Đóng'))],
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ValueListenableBuilder<List<String>>(
+            valueListenable: lines,
+            builder: (_, l, _) => ListView(
+              shrinkWrap: true,
+              children: [
+                for (final m in l.length > 40 ? l.sublist(l.length - 40) : l) SelectableText(m, style: const TextStyle(fontSize: 12)),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          ValueListenableBuilder<bool>(
+            valueListenable: done,
+            builder: (_, d, _) => TextButton(onPressed: d ? () => Navigator.of(ctx).pop() : null, child: Text(d ? 'Đóng' : 'Đang chạy...')),
+          ),
+        ],
       ),
     );
+    log('Bắt đầu thử.');
+    try {
+      final msg = await widget.onTest!(alarm, log);
+      log('Kết quả: $msg');
+    } catch (e) {
+      log('LỖI: $e');
+    }
+    done.value = true;
+    await dialog;
   }
 
   Future<void> _confirmLeave() async {

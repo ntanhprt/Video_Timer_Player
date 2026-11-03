@@ -40,17 +40,36 @@ class YoutubeCache {
   }
 
   /// Downloads the audio of [url]. Returns null on success, otherwise a short reason.
-  Future<String?> download(String url) async {
-    final viaYtDlp = await _ytDlp(url);
-    if (viaYtDlp == null) return null;
-    final viaExplode = await _explode(url);
-    return viaExplode == null ? null : 'yt-dlp: $viaYtDlp\nexplode: $viaExplode';
+  ///
+  /// Each step is reported to [log] as it happens.
+  Future<String?> download(String url, {void Function(String)? log}) async {
+    final say = log ?? (_) {};
+    say('Tải bằng yt-dlp (lần đầu phải giải nén, có thể mất vài chục giây)...');
+    final viaYtDlp = await _ytDlp(url, say);
+    if (viaYtDlp == null) {
+      say('yt-dlp: tải xong.');
+      return null;
+    }
+    say('yt-dlp lỗi: $viaYtDlp');
+    say('Thử cách dự phòng (youtube_explode)...');
+    final viaExplode = await _explode(url, say);
+    if (viaExplode == null) {
+      say('youtube_explode: tải xong.');
+      return null;
+    }
+    say('youtube_explode lỗi: $viaExplode');
+    return 'yt-dlp: $viaYtDlp\nexplode: $viaExplode';
   }
 
   static const _channel = MethodChannel('vn.aisolutions/ytdlp');
+  void Function(String)? _progress;
 
   /// yt-dlp bundled in the app (the same engine other downloader apps use). Null on success.
-  Future<String?> _ytDlp(String url) async {
+  Future<String?> _ytDlp(String url, void Function(String) say) async {
+    _progress = say;
+    _channel.setMethodCallHandler((call) async {
+      if (call.method == 'log') _progress?.call(call.arguments as String);
+    });
     try {
       final target = await _file(url);
       final tmp = '${target.path}.part.m4a';
@@ -68,7 +87,7 @@ class YoutubeCache {
     }
   }
 
-  Future<String?> _explode(String url) async {
+  Future<String?> _explode(String url, void Function(String) say) async {
     final wait = _blockedUntil?.difference(DateTime.now());
     if (wait != null && !wait.isNegative) {
       return 'YouTube đang giới hạn tốc độ từ mạng này, tự thử lại sau ~${wait.inMinutes + 1} phút';
@@ -85,10 +104,12 @@ class YoutubeCache {
       for (final entry in clients.entries) {
         final client = entry.value;
         try {
+          say('Kiểu kết nối ${entry.key}: lấy thông tin video...');
           final manifest = await yt.videos.streams.getManifest(id, ytClients: [client]);
           final audio = manifest.audioOnly;
           final mp4 = audio.where((s) => s.container == StreamContainer.mp4);
           final info = (mp4.isNotEmpty ? mp4 : audio).withHighestBitrate();
+          say('${entry.key}: đang tải âm thanh...');
           final target = await _file(url);
           final tmp = File('${target.path}.part');
           final sink = tmp.openWrite();

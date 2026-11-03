@@ -13,24 +13,32 @@ import kotlin.concurrent.thread
 /** Bridges Dart to yt-dlp (bundled by youtubedl-android) for downloading a link's audio. */
 class MainActivity : FlutterActivity() {
     private val main = Handler(Looper.getMainLooper())
+    private var channel: MethodChannel? = null
+
+    private fun log(msg: String) = main.post { channel?.invokeMethod("log", msg) }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "vn.aisolutions/ytdlp")
-            .setMethodCallHandler { call, result ->
+        channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "vn.aisolutions/ytdlp")
+        channel!!.setMethodCallHandler { call, result ->
                 if (call.method != "download") return@setMethodCallHandler result.notImplemented()
                 val url = call.argument<String>("url")!!
                 val out = call.argument<String>("out")!!
                 thread {
                     val reply: Pair<String?, String?> = try {
+                        log("Khởi tạo yt-dlp...")
                         YoutubeDL.getInstance().init(applicationContext)
+                        log("Đã khởi tạo. Đang lấy và tải âm thanh...")
                         File(out).parentFile?.mkdirs()
                         File(out).delete()
                         val req = YoutubeDLRequest(url)
                         req.addOption("-f", "bestaudio[ext=m4a]/bestaudio")
                         req.addOption("--no-playlist")
                         req.addOption("-o", out)
-                        YoutubeDL.getInstance().execute(req, null, null)
+                        YoutubeDL.getInstance().execute(req) { progress, eta, line ->
+                            val l = line.trim()
+                            if (l.isNotEmpty()) log("yt-dlp ${"$"}{progress.toInt()}% (còn ${"$"}{eta}s): ${"$"}l")
+                        }
                         if (File(out).length() > 0) Pair(out, null) else Pair(null, "yt-dlp không tạo ra tệp")
                     } catch (e: Throwable) {
                         Pair(null, e.message ?: e.toString())
