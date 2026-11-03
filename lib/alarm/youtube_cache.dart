@@ -9,6 +9,14 @@ import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 ///
 /// Extracting audio is against YouTube's terms; this is for personal use only.
 class YoutubeCache {
+  static const rateLimitCooldown = Duration(minutes: 15);
+
+  /// While set and in the future, YouTube has just rate-limited us and downloads are skipped.
+  DateTime? _blockedUntil;
+
+  /// Whether [download] is currently skipping because of a rate limit.
+  bool get rateLimited => _blockedUntil?.isAfter(DateTime.now()) ?? false;
+
   Future<File> _file(String url) async {
     final dir = Directory(p.join((await getApplicationSupportDirectory()).path, 'audio'));
     await dir.create(recursive: true);
@@ -32,6 +40,10 @@ class YoutubeCache {
 
   /// Downloads the audio of [url]. Returns null on success, otherwise a short reason.
   Future<String?> download(String url) async {
+    final wait = _blockedUntil?.difference(DateTime.now());
+    if (wait != null && !wait.isNegative) {
+      return 'YouTube đang giới hạn tốc độ từ mạng này, tự thử lại sau ~${wait.inMinutes + 1} phút';
+    }
     final yt = YoutubeExplode();
     String? lastError;
     try {
@@ -58,6 +70,12 @@ class YoutubeCache {
           }
           await tmp.rename(target.path);
           return null;
+        } on RequestLimitExceededException catch (e) {
+          // Retrying with other clients only makes the block last longer: back off.
+          debugPrint('YT rate limited [${entry.key}]: $e');
+          _blockedUntil = DateTime.now().add(rateLimitCooldown);
+          return 'YouTube đang giới hạn tốc độ từ mạng này (quá nhiều yêu cầu). '
+              'Đợi ${rateLimitCooldown.inMinutes} phút rồi thử lại; app cũng tự thử lại.';
         } catch (e) {
           lastError = '${entry.key}: $e';
           debugPrint('YT download failed [$lastError]');

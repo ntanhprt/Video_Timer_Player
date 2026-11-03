@@ -81,7 +81,14 @@ class AlarmScheduler {
   Future<void> _prefetch(Set<String> urls) async {
     var any = false;
     for (final url in urls.where(_tried.add)) {
-      if (await cache.download(url) == null) any = true;
+      final error = await cache.download(url);
+      if (error == null) {
+        any = true;
+      } else if (cache.rateLimited) {
+        // Not this link's fault: let a later sync (e.g. on app resume) try it again.
+        _tried.remove(url);
+        break;
+      }
     }
     if (any) await sync();
   }
