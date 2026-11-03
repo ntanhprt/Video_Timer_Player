@@ -14,7 +14,6 @@ import kotlin.concurrent.thread
 class MainActivity : FlutterActivity() {
     private val main = Handler(Looper.getMainLooper())
     private var channel: MethodChannel? = null
-    private var updated = false
 
     private fun log(msg: String) = main.post { channel?.invokeMethod("log", msg) }
 
@@ -29,13 +28,12 @@ class MainActivity : FlutterActivity() {
                     val reply: Pair<String?, String?> = try {
                         log("Khởi tạo yt-dlp...")
                         YoutubeDL.getInstance().init(applicationContext)
-                        if (!updated) {
-                            // The bundled yt-dlp ages quickly and YouTube changes often: fetch the latest.
+                        run {
+                            // Always update first: YouTube changes often and an old yt-dlp gets 403.
                             log("Cập nhật yt-dlp bản mới nhất (cần mạng)...")
                             try {
                                 val st = YoutubeDL.getInstance().updateYoutubeDL(applicationContext, YoutubeDL.UpdateChannel.STABLE)
                                 log("Cập nhật yt-dlp: $st, phiên bản ${YoutubeDL.getInstance().versionName(applicationContext)}")
-                                updated = true
                             } catch (e: Throwable) {
                                 log("Không cập nhật được yt-dlp: ${e.message}")
                             }
