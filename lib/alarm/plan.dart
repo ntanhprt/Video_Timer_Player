@@ -31,12 +31,18 @@ int alarmIdFor(String alarmId, int k) {
 /// Reserved for the "try it now" button.
 const testAlarmId = 1;
 
-/// Picks one of [tracks] for the ring of [alarmId] at [at].
+/// Picks one of [tracks] for the ring of [alarmId] at [at]: random-looking, or (with
+/// `random: false`) the list in order, one track per day.
 ///
 /// Looks random from ring to ring but is a pure function of its inputs, so re-registering the same
 /// alarm (every sync) keeps the same pick. Null when there are no tracks.
-String? pickTrack(List<String> tracks, String alarmId, DateTime at) {
+String? pickTrack(List<String> tracks, String alarmId, DateTime at, {bool random = true}) {
   if (tracks.isEmpty) return null;
+  if (!random) {
+    // In list order, advancing one track per day.
+    final day = DateTime.utc(at.year, at.month, at.day).millisecondsSinceEpoch ~/ Duration.millisecondsPerDay;
+    return tracks[day % tracks.length];
+  }
   var h = 0x811c9dc5;
   for (final c in '$alarmId@${at.millisecondsSinceEpoch ~/ 1000}'.codeUnits) {
     h = ((h ^ c) * 0x01000193) & 0xffffffff;

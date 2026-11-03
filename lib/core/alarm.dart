@@ -12,6 +12,9 @@ class Alarm {
   final List<String> youtubeUrls;
   /// Music files picked from the phone (copied into the app); mixed with the YouTube tracks.
   final List<String> audioFiles;
+
+  /// true: a random track each ring; false: tracks in list order, one per day.
+  final bool randomOrder;
   final VolumeSpec volume;
   final OutputKind output;
   final String? fallbackPath;
@@ -30,6 +33,7 @@ class Alarm {
     required this.schedule,
     required this.youtubeUrls,
     this.audioFiles = const [],
+    this.randomOrder = true,
     required this.volume,
     required this.output,
     this.fallbackPath,
@@ -44,6 +48,7 @@ class Alarm {
     ScheduleSpec? schedule,
     List<String>? youtubeUrls,
     List<String>? audioFiles,
+    bool? randomOrder,
     VolumeSpec? volume,
     OutputKind? output,
     String? fallbackPath,
@@ -58,6 +63,7 @@ class Alarm {
         schedule: schedule ?? this.schedule,
         youtubeUrls: youtubeUrls ?? this.youtubeUrls,
         audioFiles: audioFiles ?? this.audioFiles,
+        randomOrder: randomOrder ?? this.randomOrder,
         volume: volume ?? this.volume,
         output: output ?? this.output,
         fallbackPath: fallbackPath ?? this.fallbackPath,
@@ -73,6 +79,7 @@ class Alarm {
         'schedule': schedule.toJson(),
         'youtubeUrls': youtubeUrls,
         'audioFiles': audioFiles,
+        'randomOrder': randomOrder,
         'volume': volume.toJson(),
         'output': output.name,
         'fallbackPath': fallbackPath,
@@ -90,6 +97,7 @@ class Alarm {
           for (final u in (j['youtubeUrls'] as List?) ?? [if (j['youtubeUrl'] != null) j['youtubeUrl']]) u as String,
         ],
         audioFiles: [for (final f in (j['audioFiles'] as List?) ?? const []) f as String],
+        randomOrder: j['randomOrder'] as bool? ?? true,
         volume: VolumeSpec.fromJson(j['volume'] as Map<String, dynamic>),
         output: OutputKind.values.byName(j['output'] as String),
         fallbackPath: j['fallbackPath'] as String?,

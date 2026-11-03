@@ -62,7 +62,7 @@ class AlarmScheduler {
       var t = nextFire(a.schedule, now);
       for (var k = 0; k < occurrences && t != null; k++) {
         final id = alarmIdFor(a.id, k);
-        final audio = pickTrack(paths, a.id, t) ?? a.fallbackPath ?? fallbackAsset;
+        final audio = pickTrack(paths, a.id, t, random: a.randomOrder) ?? a.fallbackPath ?? fallbackAsset;
         desired[id] = _settings(a, id, t, audio);
         t = nextFire(a.schedule, t);
       }
@@ -156,9 +156,10 @@ class AlarmScheduler {
     var source = 'nhạc dự phòng (chưa có bài nào)';
     var path = a.fallbackPath ?? fallbackAsset;
     final urls = a.youtubeUrls.where((u) => u.trim().isNotEmpty).toList();
-    final candidates = <String>[...urls, ...a.audioFiles]..shuffle();
+    final candidates = <String>[...urls, ...a.audioFiles];
+    if (a.randomOrder) candidates.shuffle();
     final errors = <String>[];
-    say(candidates.isEmpty ? 'Chưa có link hay file nào: dùng nhạc dự phòng.' : 'Có ${urls.length} link + ${a.audioFiles.length} file, chọn ngẫu nhiên.');
+    say(candidates.isEmpty ? 'Chưa có link hay file nào: dùng nhạc dự phòng.' : 'Có ${urls.length} link + ${a.audioFiles.length} file, ${a.randomOrder ? 'chọn ngẫu nhiên' : 'lấy bài đầu tiên dùng được (chế độ theo thứ tự)'}.');
     for (final c in candidates) {
       if (!urls.contains(c)) {
         say('File trong máy: $c');

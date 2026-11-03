@@ -24,6 +24,7 @@ class MainActivity : FlutterActivity() {
                 if (call.method != "download") return@setMethodCallHandler result.notImplemented()
                 val url = call.argument<String>("url")!!
                 val out = call.argument<String>("out")!!
+                val titleOut = call.argument<String>("titleOut")
                 thread {
                     val reply: Pair<String?, String?> = try {
                         log("Khởi tạo yt-dlp...")
@@ -44,6 +45,13 @@ class MainActivity : FlutterActivity() {
                         val req = YoutubeDLRequest(url)
                         req.addOption("-f", "bestaudio[ext=m4a]/bestaudio")
                         req.addOption("--no-playlist")
+                        if (titleOut != null) {
+                            // Save the video title next to the audio so the app can list it by name.
+                            File(titleOut).delete()
+                            req.addOption("--print-to-file")
+                            req.addOption("%(title)s")
+                            req.addOption(titleOut)
+                        }
                         req.addOption("-o", out)
                         YoutubeDL.getInstance().execute(req) { progress, eta, line ->
                             val l = line.trim()

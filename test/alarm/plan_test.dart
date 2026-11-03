@@ -56,6 +56,13 @@ void main() {
       expect(pickTrack(tracks, 'x', day), pickTrack(tracks, 'x', day));
     });
 
+    test('in list order, one track per day, wrapping around', () {
+      final picks = [for (var d = 0; d < 6; d++) pickTrack(tracks, 'x', day.add(Duration(days: d)), random: false)];
+      expect(picks.sublist(0, 3).toSet(), tracks.toSet());
+      expect(picks.sublist(3), picks.sublist(0, 3));
+      expect(pickTrack(tracks, 'x', day, random: false), pickTrack(tracks, 'y', day, random: false));
+    });
+
     test('over many mornings every track gets played, none dominates', () {
       final counts = <String, int>{};
       for (var d = 0; d < 300; d++) {

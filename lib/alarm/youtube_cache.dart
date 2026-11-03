@@ -39,6 +39,18 @@ class YoutubeCache {
     return await f.exists() && await f.length() > 0 ? f.path : null;
   }
 
+  /// Title of the video behind [url] (saved next to the audio when it was downloaded), or null.
+  Future<String?> title(String url) async {
+    try {
+      final f = File('${(await _file(url)).path}.title');
+      if (!await f.exists()) return null;
+      final t = (await f.readAsString()).trim();
+      return t.isEmpty ? null : t;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Downloads the audio of [url]. Returns null on success, otherwise a short reason.
   ///
   /// Each step is reported to [log] as it happens.
@@ -73,7 +85,7 @@ class YoutubeCache {
     try {
       final target = await _file(url);
       final tmp = '${target.path}.part.m4a';
-      await _channel.invokeMethod<String>('download', {'url': url.trim(), 'out': tmp});
+      await _channel.invokeMethod<String>('download', {'url': url.trim(), 'out': tmp, 'titleOut': '${target.path}.title'});
       await File(tmp).rename(target.path);
       return null;
     } on PlatformException catch (e) {
