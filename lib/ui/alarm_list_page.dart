@@ -4,6 +4,7 @@ import '../core/alarm.dart';
 import '../core/schedule.dart';
 import '../alarm/alarm_scheduler.dart';
 import '../data/alarm_repository.dart';
+import 'about_page.dart';
 import 'alarm_edit_page.dart';
 
 const _short = {1: 'T2', 2: 'T3', 3: 'T4', 4: 'T5', 5: 'T6', 6: 'T7', 7: 'CN'};
@@ -42,7 +43,14 @@ class AlarmListPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Đánh thức')),
+      appBar: AppBar(title: const Text('Đánh thức'), actions: [
+        IconButton(
+          tooltip: 'Phiên bản & có gì mới',
+          icon: const Icon(Icons.info_outline),
+          onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const AboutPage())),
+        ),
+      ]),
+      bottomNavigationBar: const SafeArea(child: Padding(padding: EdgeInsets.only(right: 120), child: VersionLabel())),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _open(context),
         icon: const Icon(Icons.add_alarm),

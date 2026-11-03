@@ -41,7 +41,7 @@ jobs:
           # A zone with daylight saving, so the DST test in schedule_test.dart is meaningful.
           TZ: America/New_York
       - if: steps.chk.outputs.ok == 'true'
-        run: flutter build apk --release
+        run: flutter build apk --release --build-number=${{ github.run_number }}
       - uses: actions/upload-artifact@v4
         if: steps.chk.outputs.ok == 'true'
         with:
