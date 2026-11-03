@@ -31,6 +31,9 @@ int alarmIdFor(String alarmId, int k) {
 /// Reserved for the "try it now" button.
 const testAlarmId = 1;
 
+/// Reserved for the "snooze" (báo lại sau) alarm.
+const snoozeAlarmId = 2;
+
 /// Picks one of [tracks] for the ring of [alarmId] at [at]: random-looking, or (with
 /// `random: false`) the list in order, one track per day.
 ///

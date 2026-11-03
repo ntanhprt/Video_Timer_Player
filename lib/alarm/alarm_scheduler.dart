@@ -71,7 +71,7 @@ class AlarmScheduler {
 
     final existing = await Alarm.getAlarms();
     for (final e in existing) {
-      if (e.id != testAlarmId && !desired.containsKey(e.id) && e.dateTime.isAfter(now)) await Alarm.stop(e.id);
+      if (e.id != testAlarmId && e.id != snoozeAlarmId && !desired.containsKey(e.id) && e.dateTime.isAfter(now)) await Alarm.stop(e.id);
     }
     final byId = {for (final e in existing) e.id: e};
     for (final s in desired.values) {
