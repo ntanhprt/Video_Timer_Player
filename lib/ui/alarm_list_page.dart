@@ -6,6 +6,7 @@ import '../alarm/alarm_scheduler.dart';
 import '../data/alarm_repository.dart';
 import 'about_page.dart';
 import 'alarm_edit_page.dart';
+import 'alarm_summary.dart';
 
 const _short = {1: 'T2', 2: 'T3', 3: 'T4', 4: 'T5', 5: 'T6', 6: 'T7', 7: 'CN'};
 
@@ -33,11 +34,87 @@ class AlarmListPage extends StatelessWidget {
 
   String _music(Alarm a, Set<String> ready) {
     final urls = a.youtubeUrls.where((u) => u.trim().isNotEmpty).toList();
-    if (urls.isEmpty) return a.audioFiles.isEmpty ? 'nhạc dự phòng' : 'nhạc: ${a.audioFiles.length} file trong máy';
-    final done = urls.where(ready.contains).length;
-    return done == urls.length
-        ? 'nhạc YouTube: đã tải $done/${urls.length} bài (mỗi lần kêu một bài ngẫu nhiên)'
-        : 'nhạc YouTube: mới tải $done/${urls.length} bài${done == 0 ? ' (tạm dùng nhạc dự phòng)' : ''}';
+    final files = a.audioFiles.length;
+    if (urls.isEmpty && files == 0) return 'Nhạc: dự phòng của app (chưa thêm bài nào)';
+    final done = urls.where(ready.contains).length + files;
+    final total = urls.length + files;
+    final order = a.randomOrder ? 'ngẫu nhiên' : 'theo thứ tự';
+    final state = done == 0 ? 'chưa tải xong bài nào, tạm dùng nhạc dự phòng' : '$done/$total bài sẵn sàng';
+    return 'Nhạc: $total bài, phát $order • $state';
+  }
+
+  Widget _line(BuildContext context, IconData icon, String text, {Color? color}) => Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Icon(icon, size: 18, color: color ?? Theme.of(context).colorScheme.onSurfaceVariant),
+          const SizedBox(width: 8),
+          Expanded(child: Text(text, style: Theme.of(context).textTheme.bodyMedium)),
+        ]),
+      );
+
+  Widget _dayChips(BuildContext context, Set<int> days, bool enabled) {
+    final scheme = Theme.of(context).colorScheme;
+    return Row(children: [
+      for (final d in weekdayShort.entries)
+        Container(
+          margin: const EdgeInsets.only(right: 4),
+          width: 32,
+          height: 32,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: days.contains(d.key) ? (enabled ? scheme.primary : scheme.outline) : Colors.transparent,
+            border: Border.all(color: scheme.outlineVariant),
+          ),
+          child: Text(
+            d.value,
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: days.contains(d.key) ? scheme.onPrimary : scheme.onSurfaceVariant),
+          ),
+        ),
+    ]);
+  }
+
+  Widget _card(BuildContext context, Alarm a, Set<String> ready, DateTime now) {
+    final theme = Theme.of(context);
+    final next = a.enabled ? nextFire(a.schedule, now) : null;
+    final days = scheduleDays(a.schedule);
+    final dim = a.enabled ? null : theme.colorScheme.onSurface.withValues(alpha: 0.5);
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => _open(context, a),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(scheduleHeadline(a.schedule), style: theme.textTheme.displaySmall?.copyWith(fontWeight: FontWeight.bold, color: dim)),
+                  Text(a.name, style: theme.textTheme.titleMedium?.copyWith(color: dim)),
+                ]),
+              ),
+              Switch(value: a.enabled, onChanged: (on) => repo.upsert(a.copyWith(enabled: on))),
+            ]),
+            const SizedBox(height: 8),
+            if (days != null) _dayChips(context, days, a.enabled),
+            _line(context, Icons.repeat, scheduleKind(a.schedule)),
+            _line(
+              context,
+              Icons.alarm,
+              a.enabled
+                  ? (next == null ? 'Không còn lần kêu nào' : 'Kêu tiếp: ${describeNext(next, now)} (${untilLabel(next, now)})')
+                  : 'Đang tắt, sẽ không kêu',
+              color: a.enabled ? theme.colorScheme.primary : null,
+            ),
+            _line(context, Icons.volume_up, volumeLabel(a.volume)),
+            _line(context, Icons.timer_outlined, holdLabel(a.volume)),
+            _line(context, Icons.speaker, 'Phát ra: ${outputLabel(a.output)}'),
+            _line(context, Icons.music_note, _music(a, ready)),
+          ]),
+        ),
+      ),
+    );
   }
 
   @override
@@ -68,18 +145,8 @@ class AlarmListPage extends StatelessWidget {
             builder: (context, ready, _) => ListView.separated(
             padding: const EdgeInsets.only(bottom: 88),
             itemCount: alarms.length,
-            separatorBuilder: (_, _) => const Divider(height: 1),
-            itemBuilder: (context, i) {
-              final a = alarms[i];
-              final next = a.enabled ? nextFire(a.schedule, now) : null;
-              return ListTile(
-                title: Text(a.name),
-                subtitle: Text('${a.enabled ? describeNext(next, now) : 'Đang tắt'} · ${outputLabel(a.output)}\n${_music(a, ready)}'),
-                isThreeLine: true,
-                trailing: Switch(value: a.enabled, onChanged: (on) => repo.upsert(a.copyWith(enabled: on))),
-                onTap: () => _open(context, a),
-              );
-            },
+            separatorBuilder: (_, _) => const SizedBox.shrink(),
+            itemBuilder: (context, i) => _card(context, alarms[i], ready, now),
             ),
           );
         },
