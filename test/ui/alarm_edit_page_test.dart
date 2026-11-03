@@ -92,7 +92,7 @@ void main() {
     expect(find.text('Chưa lưu'), findsOneWidget);
     await t.tap(find.text('Ở lại'));
     await t.pumpAndSettle();
-    expect(find.text('https://youtu.be/dQw4w9WgXcQ'), findsOneWidget);
+    expect(find.descendant(of: find.byKey(const Key('youtubeUrl')), matching: find.text('https://youtu.be/dQw4w9WgXcQ')), findsOneWidget);
     expect(repo.saved, isEmpty);
   });
 
