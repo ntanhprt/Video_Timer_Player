@@ -6,7 +6,7 @@ sealed class VoiceCommand {
 class StopCommand extends VoiceCommand {
   const StopCommand();
   @override
-  bool operator ==(Object o) => o is StopCommand;
+  bool operator ==(Object other) => other is StopCommand;
   @override
   int get hashCode => 1;
   @override
@@ -17,7 +17,7 @@ class SnoozeCommand extends VoiceCommand {
   final Duration delay;
   const SnoozeCommand(this.delay);
   @override
-  bool operator ==(Object o) => o is SnoozeCommand && o.delay == delay;
+  bool operator ==(Object other) => other is SnoozeCommand && other.delay == delay;
   @override
   int get hashCode => delay.hashCode;
   @override

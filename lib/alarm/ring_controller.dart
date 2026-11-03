@@ -99,10 +99,13 @@ class RingController {
           voiceStatus.value = 'Nghe được: "$words"';
           _handle(words);
         },
-        localeId: _localeId,
-        listenFor: const Duration(seconds: 60),
-        pauseFor: const Duration(seconds: 8),
-        listenOptions: SpeechListenOptions(partialResults: true, cancelOnError: false),
+        listenOptions: SpeechListenOptions(
+          partialResults: true,
+          cancelOnError: false,
+          localeId: _localeId,
+          listenFor: const Duration(seconds: 60),
+          pauseFor: const Duration(seconds: 8),
+        ),
       );
     } catch (e) {
       debugPrint('Speech start failed: $e');
