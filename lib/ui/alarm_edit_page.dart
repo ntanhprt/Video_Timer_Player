@@ -176,12 +176,12 @@ class _AlarmEditPageState extends State<AlarmEditPage> {
   }
 
   Future<void> _pickFiles() async {
-    final picked = await FilePicker.platform.pickFiles(type: FileType.audio, allowMultiple: true);
-    if (picked == null) return;
+    final picked = await FilePicker.pickFiles(type: FileType.audio);
+    if (picked.isEmpty) return;
     final dir = Directory(p.join((await getApplicationSupportDirectory()).path, 'music'));
     await dir.create(recursive: true);
     final added = <String>[];
-    for (final f in picked.files) {
+    for (final f in picked) {
       final src = f.path;
       if (src == null) continue;
       // Copy so the alarm still works if the original is moved or the picker cache is cleared.
