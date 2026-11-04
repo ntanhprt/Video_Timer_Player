@@ -6,6 +6,10 @@ import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.media.audiofx.AcousticEchoCanceler
+import android.media.audiofx.AudioEffect
+import android.media.audiofx.AutomaticGainControl
+import android.media.audiofx.NoiseSuppressor
 import com.k2fsa.sherpa.onnx.FeatureConfig
 import com.k2fsa.sherpa.onnx.OfflineModelConfig
 import com.k2fsa.sherpa.onnx.OfflineRecognizer
@@ -76,6 +80,13 @@ class VoiceListener(private val ctx: Context, private val emit: (String, Any?) -
         prefs.edit().putInt("type", type).apply()
     }
 
+    /** Echo cancelling + noise suppression, to hear the user over the alarm's own music. */
+    fun filterOn(): Boolean = prefs.getBoolean("filter", true)
+
+    fun saveFilter(on: Boolean) {
+        prefs.edit().putBoolean("filter", on).apply()
+    }
+
     private fun chosenDevice(): AudioDeviceInfo? {
         val all = am.getDevices(AudioManager.GET_DEVICES_INPUTS)
         val want = savedType()
@@ -98,13 +109,17 @@ class VoiceListener(private val ctx: Context, private val emit: (String, Any?) -
         running = true
         worker = thread(name = "voice-listener") {
             var record: AudioRecord? = null
+            val effects = ArrayList<AudioEffect>()
             try {
                 prepare()
                 val rec = recognizer!!
                 val minBuf = AudioRecord.getMinBufferSize(16000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
                 // Two seconds of buffer so a decode in progress never makes us drop audio.
+                val filter = filterOn()
+                // VOICE_COMMUNICATION turns on the phone's voice processing (echo and noise
+                // cancelling); VOICE_RECOGNITION is the raw, unprocessed signal.
                 record = AudioRecord(
-                    MediaRecorder.AudioSource.VOICE_RECOGNITION, 16000,
+                    if (filter) MediaRecorder.AudioSource.VOICE_COMMUNICATION else MediaRecorder.AudioSource.VOICE_RECOGNITION, 16000,
                     AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, max(minBuf, 64000),
                 )
                 if (record.state != AudioRecord.STATE_INITIALIZED) {
@@ -115,9 +130,26 @@ class VoiceListener(private val ctx: Context, private val emit: (String, Any?) -
                 // nothing, so the source is chosen explicitly (default: the phone's own microphone).
                 val device = chosenDevice()
                 if (device != null) record.setPreferredDevice(device)
+                val applied = ArrayList<String>()
+                if (filter) {
+                    val id = record.audioSessionId
+                    fun <T : AudioEffect> add(name: String, available: Boolean, create: () -> T?) {
+                        try {
+                            if (!available) return
+                            val e = create() ?: return
+                            e.enabled = true
+                            effects.add(e)
+                            applied.add(name)
+                        } catch (_: Throwable) {}
+                    }
+                    add("khử vọng", AcousticEchoCanceler.isAvailable()) { AcousticEchoCanceler.create(id) }
+                    add("giảm ồn", NoiseSuppressor.isAvailable()) { NoiseSuppressor.create(id) }
+                    add("tự chỉnh âm lượng", AutomaticGainControl.isAvailable()) { AutomaticGainControl.create(id) }
+                }
                 record.startRecording()
                 emit("status", "listening")
-                emit("device", device?.let { deviceLabel(it) } ?: "micro mặc định")
+                val label = device?.let { deviceLabel(it) } ?: "micro mặc định"
+                emit("device", if (!filter) "$label (không lọc)" else "$label (lọc: ${applied.ifEmpty { listOf("máy không hỗ trợ hiệu ứng, chỉ dùng chế độ thoại") }.joinToString(", ")})")
 
                 val chunk = ShortArray(1600) // 100 ms
                 val preRoll = ArrayDeque<FloatArray>()
@@ -125,7 +157,9 @@ class VoiceListener(private val ctx: Context, private val emit: (String, Any?) -
                 var inSpeech = false
                 var silent = 0
                 var chunks = 0
-                var floor = 0.005
+                // Quietest 100 ms of the last 5 s: music playing the whole time counts as the
+                // room, and the voice has to stand above it.
+                val recent = ArrayDeque<Double>()
 
                 fun flatten(parts: List<FloatArray>): FloatArray {
                     val out = FloatArray(parts.sumOf { it.size })
@@ -134,17 +168,24 @@ class VoiceListener(private val ctx: Context, private val emit: (String, Any?) -
                     return out
                 }
 
-                fun finish() {
+                fun finish(keepTail: Boolean = false) {
                     // Drop the trailing silence, keep enough audio for the model to settle.
                     val voiced = segment.size - max(0, silent - 2)
                     if (voiced >= 4) {
                         val text = decode(rec, flatten(segment))
                         if (text.isNotBlank()) emit("final", text)
                     }
-                    segment = ArrayList()
-                    inSpeech = false
+                    if (keepTail) {
+                        // Cut because it ran long (music never lets it fall silent): the next
+                        // piece starts with the last second, so a command is not split in two.
+                        segment = ArrayList(segment.takeLast(10))
+                        chunks = segment.size
+                    } else {
+                        segment = ArrayList()
+                        inSpeech = false
+                        chunks = 0
+                    }
                     silent = 0
-                    chunks = 0
                 }
 
                 while (running) {
@@ -159,9 +200,10 @@ class VoiceListener(private val ctx: Context, private val emit: (String, Any?) -
                     val rms = sqrt(sum / n)
                     emit("level", min(1.0, rms * 12))
 
-                    val threshold = max(0.012, floor * 2.5)
-                    val loud = rms > threshold
-                    if (!loud) floor = floor * 0.95 + rms * 0.05 // follows the room, not the voice
+                    recent.addLast(rms)
+                    if (recent.size > 50) recent.removeFirst()
+                    val floor = recent.minOrNull() ?: rms
+                    val loud = rms > max(0.012, floor * 1.8)
 
                     if (!inSpeech) {
                         if (loud) {
@@ -179,9 +221,11 @@ class VoiceListener(private val ctx: Context, private val emit: (String, Any?) -
                     segment.add(f)
                     chunks++
                     silent = if (loud) 0 else silent + 1
-                    if (silent >= 7 || segment.size >= 80) {
+                    if (silent >= 7) {
                         finish()
                         preRoll.clear()
+                    } else if (segment.size >= 40) {
+                        finish(keepTail = true)
                     } else if (chunks % 10 == 0 && segment.size >= 5) {
                         // A running guess so the user sees something while still talking.
                         val text = decode(rec, flatten(segment))
@@ -192,6 +236,7 @@ class VoiceListener(private val ctx: Context, private val emit: (String, Any?) -
                 emit("error", e.message ?: e.toString())
             } finally {
                 try { record?.stop() } catch (_: Throwable) {}
+                for (e in effects) try { e.release() } catch (_: Throwable) {}
                 record?.release()
                 running = false
             }

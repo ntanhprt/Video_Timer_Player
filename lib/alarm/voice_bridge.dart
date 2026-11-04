@@ -28,4 +28,9 @@ class VoiceBridge {
   Future<int> savedInputType() async => await _channel.invokeMethod<int>('savedInputType') ?? -1;
 
   Future<void> saveInputType(int type) => _channel.invokeMethod<void>('saveInputType', {'type': type});
+
+  /// Whether the microphone is set up to cancel the echo of the alarm's own music.
+  Future<bool> filterOn() async => await _channel.invokeMethod<bool>('filterOn') ?? true;
+
+  Future<void> saveFilter(bool on) => _channel.invokeMethod<void>('saveFilter', {'on': on});
 }

@@ -7,6 +7,7 @@ import '../data/alarm_repository.dart';
 import 'about_page.dart';
 import 'alarm_edit_page.dart';
 import 'alarm_summary.dart';
+import 'clock_header.dart';
 import 'mic_test_page.dart';
 import 'tuya_page.dart';
 import '../tuya/tuya_hub.dart';
@@ -146,6 +147,7 @@ class AlarmListPage extends StatelessWidget {
         label: const Text('Thêm'),
       ),
       body: Column(children: [
+        const ClockHeader(),
         if (tuya != null) TuyaTile(hub: tuya!),
         Expanded(child: StreamBuilder<List<Alarm>>(
         stream: repo.watch(),

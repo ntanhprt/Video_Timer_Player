@@ -32,6 +32,8 @@ class MainActivity : FlutterActivity() {
                 "inputDevices" -> return@setMethodCallHandler result.success(voice.inputDevices())
                 "savedInputType" -> return@setMethodCallHandler result.success(voice.savedType())
                 "saveInputType" -> voice.saveChoice(call.argument<Int>("type") ?: -1)
+                "filterOn" -> return@setMethodCallHandler result.success(voice.filterOn())
+                "saveFilter" -> voice.saveFilter(call.argument<Boolean>("on") ?: true)
                 else -> return@setMethodCallHandler result.notImplemented()
             }
             result.success(null)

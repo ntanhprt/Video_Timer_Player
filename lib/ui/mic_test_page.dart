@@ -15,6 +15,7 @@ class MicTestPage extends StatefulWidget {
 class _MicTestPageState extends State<MicTestPage> {
   List<({int type, String label})> _devices = [];
   int _saved = -1;
+  bool _filter = true;
   bool _on = false;
   String? _error;
 
@@ -34,10 +35,12 @@ class _MicTestPageState extends State<MicTestPage> {
     try {
       final d = await widget.ring.bridge.inputDevices();
       final s = await widget.ring.bridge.savedInputType();
+      final f = await widget.ring.bridge.filterOn();
       if (!mounted) return;
       setState(() {
         _devices = d;
         _saved = s;
+        _filter = f;
       });
     } catch (e) {
       if (mounted) setState(() => _error = '$e');
@@ -47,6 +50,12 @@ class _MicTestPageState extends State<MicTestPage> {
   Future<void> _choose(int type) async {
     await widget.ring.bridge.saveInputType(type);
     setState(() => _saved = type);
+    if (_on) await _toggle(restart: true);
+  }
+
+  Future<void> _setFilter(bool on) async {
+    await widget.ring.bridge.saveFilter(on);
+    setState(() => _filter = on);
     if (_on) await _toggle(restart: true);
   }
 
@@ -112,6 +121,13 @@ class _MicTestPageState extends State<MicTestPage> {
             const RadioListTile<int>(value: -1, title: Text('Tự động (micro của máy)')),
             for (final d in _devices) RadioListTile<int>(value: d.type, title: Text(d.label)),
           ]),
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Lọc tiếng nhạc khi nghe'),
+          subtitle: const Text('Bật khử vọng + giảm ồn của máy để nghe lệnh khi chuông đang kêu. Nếu nghe kém hơn thì tắt đi.'),
+          value: _filter,
+          onChanged: _setFilter,
         ),
         const Divider(height: 32),
         Text('Thử micro', style: text.titleMedium),

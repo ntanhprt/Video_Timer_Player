@@ -4,6 +4,14 @@ typedef ChangelogEntry = ({String version, String date, List<String> changes});
 
 const changelog = <ChangelogEntry>[
   (
+    version: '0.8.1',
+    date: '04/11/2026',
+    changes: [
+      'Màn hình chính có đồng hồ lớn (giờ:phút:giây và ngày) ở trên cùng, để tắt chuông xong vẫn xem giờ được.',
+      'Nghe lệnh khi nhạc đang kêu: bật khử vọng và giảm ồn của máy, coi tiếng nhạc đều là nền để tìm chỗ anh nói, và cứ 4 giây lại nhận dạng một lần thay vì chờ im lặng. Có công tắc "Lọc tiếng nhạc khi nghe" trong trang Micro & giọng nói để so sánh bật/tắt.',
+    ],
+  ),
+  (
     version: '0.8.0',
     date: '03/11/2026',
     changes: [
