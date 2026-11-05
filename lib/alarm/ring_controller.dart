@@ -59,8 +59,6 @@ class RingController {
     unawaited(_loadCustom());
     _sub = Alarm.ringing.listen((s) => _onRinging(s.alarms));
     _onRinging(Alarm.ringing.value.alarms);
-    // Load the speech model now rather than at the moment the alarm rings.
-    unawaited(_voice.prepare().catchError((Object e) => debugPrint('Voice prepare failed: $e')));
   }
 
   Future<void> _loadCustom() async {
@@ -143,11 +141,9 @@ class RingController {
       _partial = '';
       unawaited(_voice.stop().catchError((Object _) {}));
     } else if (wasEmpty) {
+      // The microphone is not opened while ringing: the user stops the alarm by hand, and
+      // recording could interfere with the music.
       _acted = false;
-      voiceStatus.value = 'Đang bật micro...';
-      unawaited(_voice.start().catchError((Object e) {
-        voiceStatus.value = 'Không bật được giọng nói: $e';
-      }));
     }
   }
 

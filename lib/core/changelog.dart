@@ -4,6 +4,13 @@ typedef ChangelogEntry = ({String version, String date, List<String> changes});
 
 const changelog = <ChangelogEntry>[
   (
+    version: '0.8.2',
+    date: '05/11/2026',
+    changes: [
+      'Bỏ nghe giọng nói khi chuông kêu: chuông chỉ phát nhạc theo cấu hình, anh tắt hoặc báo lại bằng tay. Không còn mở micro nên không thể ảnh hưởng đến việc phát nhạc.',
+    ],
+  ),
+  (
     version: '0.8.1',
     date: '04/11/2026',
     changes: [

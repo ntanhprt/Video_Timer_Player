@@ -48,8 +48,6 @@ Future<void> _askPermissions() async {
   await Permission.notification.request();
   await Permission.scheduleExactAlarm.request();
   await Permission.ignoreBatteryOptimizations.request();
-  // For "tắt chuông đi" / "mười phút nữa báo lại" while an alarm rings.
-  await Permission.microphone.request();
 }
 
 class _OnResume with WidgetsBindingObserver {

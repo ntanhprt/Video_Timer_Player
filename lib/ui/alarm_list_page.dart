@@ -8,7 +8,6 @@ import 'about_page.dart';
 import 'alarm_edit_page.dart';
 import 'alarm_summary.dart';
 import 'clock_header.dart';
-import 'mic_test_page.dart';
 import 'tuya_page.dart';
 import '../tuya/tuya_hub.dart';
 import '../alarm/ring_controller.dart';
@@ -128,12 +127,6 @@ class AlarmListPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Đánh thức'), actions: [
-        if (ring != null)
-          IconButton(
-            tooltip: 'Micro & giọng nói',
-            icon: const Icon(Icons.mic),
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => MicTestPage(ring: ring!))),
-          ),
         IconButton(
           tooltip: 'Phiên bản & có gì mới',
           icon: const Icon(Icons.info_outline),
