@@ -32,4 +32,11 @@ ssh -o BatchMode=yes "$ZORIN" 'adb devices | grep -w device >/dev/null' \
 
 scp -q "$APK" "$ZORIN:/tmp/video_timer_player.apk"
 ssh "$ZORIN" 'adb install -r /tmp/video_timer_player.apk'
+# Installing force-stops the app, and Android drops every alarm of a stopped app: open it so it
+# registers them again, then confirm it is really running and not stopped.
+ssh "$ZORIN" 'P=vn.aisolutions.video_timer_player
+adb shell monkey -p $P -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1
+sleep 6
+adb shell dumpsys package $P | grep -q "stopped=false" || { echo "App is still stopped after install: alarms are NOT registered" >&2; exit 1; }
+adb shell dumpsys alarm | grep -q "tag=.*:$P/" || { echo "App is running but has no alarms registered (none enabled?)" >&2; }'
 echo OK
