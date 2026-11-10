@@ -4,6 +4,14 @@ typedef ChangelogEntry = ({String version, String date, List<String> changes});
 
 const changelog = <ChangelogEntry>[
   (
+    version: '0.8.3',
+    date: '10/11/2026',
+    changes: [
+      'Tự phát hiện báo thức bị hệ thống xóa: khi mở app, nếu các báo thức đang bật không còn được đăng ký với Android (app từng bị dừng hẳn, thường do MIUI dọn bộ nhớ), màn hình chính hiện cảnh báo đỏ "Báo thức có thể đã bị lỡ" cho đến khi anh bấm "Đã hiểu"; app tự đăng ký lại ngay.',
+      'Cảnh báo sớm khi thiếu quyền làm báo thức kém tin cậy (thông báo, báo thức chính xác, pin không hạn chế) kèm nút mở cài đặt app.',
+    ],
+  ),
+  (
     version: '0.8.2',
     date: '05/11/2026',
     changes: [

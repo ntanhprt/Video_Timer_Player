@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import '../core/alarm.dart' as model;
 import '../core/schedule.dart';
 import '../data/alarm_repository.dart';
+import 'alarm_health.dart';
 import 'plan.dart';
 import 'youtube_cache.dart';
 
@@ -31,15 +32,38 @@ class AlarmScheduler {
   /// More native alarms to keep registered (the Tuya timers), by id.
   final Map<int, AlarmSettings> Function(DateTime now)? extraAlarms;
 
-  AlarmScheduler(this.repo, this.cache, {DateTime Function()? clock, this.extraAlarms}) : _now = clock ?? DateTime.now;
+  /// Permissions the phone has not granted that make the alarm unreliable.
+  final Future<Set<AlarmProblem>> Function()? permissionProblems;
+
+  /// What is wrong with the alarm right now, for the list screen. Updated by `sync(audit: true)`.
+  final health = ValueNotifier<AlarmHealth>(AlarmHealth.ok);
+
+  AlarmScheduler(this.repo, this.cache, {DateTime Function()? clock, this.extraAlarms, this.permissionProblems}) : _now = clock ?? DateTime.now;
+
+  /// The user has read the "alarms were wiped" notice.
+  void dismissWiped() => health.value = health.value.without(AlarmProblem.wiped);
 
   /// Registers the native alarms (serialised), then fetches any missing audio in the background.
-  Future<void> sync() {
-    _queue = _queue.then((_) => _sync()).catchError((Object e) => debugPrint('sync failed: $e'));
+  ///
+  /// With [audit], first compares what Android has registered with what should be, so a wipe by
+  /// the system is noticed. Use it only when the app starts or comes back to the front: right after
+  /// an edit the new alarm is legitimately not registered yet.
+  Future<void> sync({bool audit = false}) {
+    _queue = _queue.then((_) => _sync(audit: audit)).catchError((Object e) => debugPrint('sync failed: $e'));
     return _queue;
   }
 
-  Future<void> _sync() async {
+  Future<void> _audit(Set<int> expected, List<AlarmSettings> existing) async {
+    final problems = await permissionProblems?.call() ?? const <AlarmProblem>{};
+    health.value = assessHealth(
+      expected: expected,
+      registered: {for (final e in existing) e.id},
+      permissionProblems: problems,
+      previous: health.value,
+    );
+  }
+
+  Future<void> _sync({bool audit = false}) async {
     // Re-registering a ringing alarm would silence it.
     if (await Alarm.isRinging()) return;
     final now = _now();
@@ -74,6 +98,7 @@ class AlarmScheduler {
     ready.value = cached;
 
     final existing = await Alarm.getAlarms();
+    if (audit) await _audit(desired.keys.toSet(), existing);
     for (final e in existing) {
       if (e.id != testAlarmId && e.id != snoozeAlarmId && !desired.containsKey(e.id) && e.dateTime.isAfter(now)) await Alarm.stop(e.id);
     }

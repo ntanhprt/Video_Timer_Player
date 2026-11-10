@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:sqflite/sqflite.dart';
 
+import 'alarm/alarm_health.dart';
 import 'alarm/alarm_scheduler.dart';
 import 'alarm/commands/custom.dart';
 import 'alarm/ring_controller.dart';
@@ -27,11 +28,14 @@ Future<void> main() async {
   final support = await getApplicationSupportDirectory();
   final hub = TuyaHub(store: TuyaStore(File(p.join(support.path, 'tuya.json'))), client: TuyaClient());
   await hub.load();
-  final scheduler = AlarmScheduler(repo, YoutubeCache(), extraAlarms: (now) => tuyaAlarms(hub.data.value, now));
+  final scheduler = AlarmScheduler(repo, YoutubeCache(),
+      extraAlarms: (now) => tuyaAlarms(hub.data.value, now), permissionProblems: permissionProblems);
+  // First thing: look at what Android still has registered (a force-stop wipes it), then re-register.
+  await scheduler.sync(audit: true);
   // Every edit re-registers the native alarms; so does coming back to the app.
   repo.watch().listen((_) => scheduler.sync());
   hub.data.addListener(scheduler.sync);
-  WidgetsBinding.instance.addObserver(_OnResume(scheduler.sync));
+  WidgetsBinding.instance.addObserver(_OnResume(() => scheduler.sync(audit: true)));
   final ring = RingController(
     onSnooze: snooze,
     onTuya: (device, on) async {
@@ -49,6 +53,13 @@ Future<void> _askPermissions() async {
   await Permission.scheduleExactAlarm.request();
   await Permission.ignoreBatteryOptimizations.request();
 }
+
+/// Settings that, when off, make Android stop or delay the alarm.
+Future<Set<AlarmProblem>> permissionProblems() async => {
+      if (!await Permission.notification.isGranted) AlarmProblem.notifications,
+      if (!await Permission.scheduleExactAlarm.isGranted) AlarmProblem.exactAlarm,
+      if (!await Permission.ignoreBatteryOptimizations.isGranted) AlarmProblem.battery,
+    };
 
 class _OnResume with WidgetsBindingObserver {
   final Future<void> Function() onResume;

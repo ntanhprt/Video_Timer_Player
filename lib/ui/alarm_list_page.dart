@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../core/alarm.dart';
 import '../core/schedule.dart';
@@ -8,6 +9,7 @@ import 'about_page.dart';
 import 'alarm_edit_page.dart';
 import 'alarm_summary.dart';
 import 'clock_header.dart';
+import 'health_banner.dart';
 import 'tuya_page.dart';
 import '../tuya/tuya_hub.dart';
 import '../alarm/ring_controller.dart';
@@ -141,6 +143,7 @@ class AlarmListPage extends StatelessWidget {
       ),
       body: Column(children: [
         const ClockHeader(),
+        HealthBanner(health: scheduler.health, onOpenSettings: openAppSettings, onDismissWiped: scheduler.dismissWiped),
         if (tuya != null) TuyaTile(hub: tuya!),
         Expanded(child: StreamBuilder<List<Alarm>>(
         stream: repo.watch(),
