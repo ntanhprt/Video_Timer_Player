@@ -37,6 +37,7 @@ class AlarmListPage extends StatelessWidget {
   void _open(BuildContext context, [Alarm? a]) => Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => AlarmEditPage(repo: repo, initial: a, onTest: (alarm, log) => scheduler.testIn(alarm, const Duration(seconds: 10), log: log),
           onDownload: (urls, log) => scheduler.downloadNow(urls, log: log),
+          onLibrary: scheduler.musicLibrary,
           cachedPath: scheduler.cache.cachedPath,
           titleOf: scheduler.cache.title)));
 

@@ -6,14 +6,15 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 
+import '../alarm/music_library.dart';
 import '../core/alarm.dart';
 import '../core/schedule.dart';
 import '../core/validation.dart';
 import '../core/volume_curve.dart';
 import '../data/alarm_repository.dart';
 import 'curve_preview.dart';
+import 'library_sheet.dart';
 
 const _dayNames = {1: 'T2', 2: 'T3', 3: 'T4', 4: 'T5', 5: 'T6', 6: 'T7', 7: 'CN'};
 
@@ -47,7 +48,10 @@ class AlarmEditPage extends StatefulWidget {
 
   /// Title of the video behind a link, once downloaded.
   final Future<String?> Function(String url)? titleOf;
-  const AlarmEditPage({super.key, required this.repo, this.initial, this.onTest, this.onDownload, this.cachedPath, this.titleOf});
+
+  /// Every audio file on the phone, whichever alarm it came from, to choose into this alarm.
+  final Future<List<LibraryTrack>> Function()? onLibrary;
+  const AlarmEditPage({super.key, required this.repo, this.initial, this.onTest, this.onDownload, this.cachedPath, this.titleOf, this.onLibrary});
 
   @override
   State<AlarmEditPage> createState() => _AlarmEditPageState();
@@ -124,8 +128,18 @@ class _AlarmEditPageState extends State<AlarmEditPage> {
     if (errors.isNotEmpty) return;
     await widget.repo.upsert(alarm);
     if (!mounted) return;
+    _closeAfterRebuild();
+  }
+
+  /// Closes the page without the "unsaved changes" question.
+  ///
+  /// `canPop` is only read when the page rebuilds, so mark everything as saved first and pop on the
+  /// next frame; popping right away still sees the old unsaved state and asks.
+  void _closeAfterRebuild() {
     setState(() => _baseline = _snapshot());
-    Navigator.of(context).maybePop();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) Navigator.of(context).maybePop();
+    });
   }
 
   /// Shows a dialog that fills with the steps of [task] as it runs.
@@ -342,6 +356,33 @@ class _AlarmEditPageState extends State<AlarmEditPage> {
     ]);
   }
 
+  /// Opens the list of every audio file on the phone and adds the ticked ones to this alarm.
+  Future<void> _addFromLibrary() async {
+    final all = await widget.onLibrary!();
+    if (!mounted) return;
+    final links = parseLinks(_url.text);
+    bool inList(LibraryTrack t) => (t.url != null && links.contains(t.url)) || _files.contains(t.path);
+    final picked = await showModalBottomSheet<List<LibraryTrack>>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => LibrarySheet(tracks: all, alreadyIn: inList),
+    );
+    if (picked == null || picked.isEmpty || !mounted) return;
+    final urls = [...links];
+    final files = [..._files];
+    for (final t in picked) {
+      final u = t.url;
+      if (u != null) {
+        if (!urls.contains(u)) urls.add(u);
+        _cachedFutures.remove(u);
+      } else if (!files.contains(t.path)) {
+        files.add(t.path);
+      }
+    }
+    setState(() => _files = files);
+    _url.text = urls.join('\n');
+  }
+
   Widget _groupHeader(String text) => Padding(
         padding: const EdgeInsets.only(top: 8),
         child: Text(text, style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
@@ -350,8 +391,7 @@ class _AlarmEditPageState extends State<AlarmEditPage> {
   Future<void> _pickFiles() async {
     final picked = await FilePicker.pickFiles(type: FileType.audio);
     if (picked.isEmpty) return;
-    final dir = Directory(p.join((await getApplicationSupportDirectory()).path, 'music'));
-    await dir.create(recursive: true);
+    final dir = await musicDirectory();
     final added = <String>[];
     for (final f in picked) {
       final src = f.path;
@@ -376,17 +416,14 @@ class _AlarmEditPageState extends State<AlarmEditPage> {
         ],
       ),
     );
-    if (leave == true && mounted) {
-      setState(() => _baseline = _snapshot());
-      Navigator.of(context).maybePop();
-    }
+    if (leave == true && mounted) _closeAfterRebuild();
   }
 
   Future<void> _delete() async {
     final a = widget.initial;
     if (a == null) return;
     await widget.repo.softDelete(a.id);
-    if (mounted) Navigator.of(context).maybePop();
+    if (mounted) _closeAfterRebuild();
   }
 
   Future<void> _pickTime(Weekly w) async {
@@ -409,17 +446,16 @@ class _AlarmEditPageState extends State<AlarmEditPage> {
         title: Text('${widget.initial == null ? 'Báo thức mới' : 'Sửa báo thức'}${_dirty ? ' • chưa lưu' : ''}'),
         actions: [
           if (widget.initial != null) IconButton(tooltip: 'Xóa', icon: const Icon(Icons.delete_outline), onPressed: _delete),
-        ],
-      ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-          child: FilledButton.icon(
-            onPressed: _save,
-            icon: const Icon(Icons.save),
-            label: const Text('Lưu'),
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: FilledButton.icon(
+              key: const Key('save'),
+              onPressed: _save,
+              icon: const Icon(Icons.save),
+              label: const Text('Lưu'),
+            ),
           ),
-        ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -466,6 +502,16 @@ class _AlarmEditPageState extends State<AlarmEditPage> {
             icon: const Icon(Icons.folder_open),
             label: const Text('Chọn file nhạc trong máy (nhiều file)'),
           ),
+          if (widget.onLibrary != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: OutlinedButton.icon(
+                key: const Key('pickFromLibrary'),
+                onPressed: _addFromLibrary,
+                icon: const Icon(Icons.library_music),
+                label: const Text('Chọn từ nhạc đã tải / đã có trong máy'),
+              ),
+            ),
           const SizedBox(height: 12),
           _trackList(),
           const SizedBox(height: 16),

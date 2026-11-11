@@ -18,10 +18,29 @@ class YoutubeCache {
   /// Whether [download] is currently skipping because of a rate limit.
   bool get rateLimited => _blockedUntil?.isAfter(DateTime.now()) ?? false;
 
-  Future<File> _file(String url) async {
-    final dir = Directory(p.join((await getApplicationSupportDirectory()).path, 'audio'));
+  final Future<Directory> Function()? _dir;
+
+  YoutubeCache({Future<Directory> Function()? dir}) : _dir = dir;
+
+  /// Where the downloaded audio lives.
+  Future<Directory> audioDirectory() async {
+    final dir = _dir != null ? await _dir() : Directory(p.join((await getApplicationSupportDirectory()).path, 'audio'));
     await dir.create(recursive: true);
-    return File(p.join(dir.path, '${_hash(url)}.m4a'));
+    return dir;
+  }
+
+  Future<File> _file(String url) async => File(p.join((await audioDirectory()).path, '${keyOf(url)}.m4a'));
+
+  /// File name (without extension) the audio of [url] is stored under.
+  static String keyOf(String url) => _hash(url);
+
+  /// Saves the link next to the audio so the file can be listed and reused without knowing it.
+  Future<void> _remember(String url) async {
+    try {
+      await File('${(await _file(url)).path}.url').writeAsString(url.trim());
+    } catch (e) {
+      debugPrint('YT could not save link: $e');
+    }
   }
 
   static String _hash(String s) {
@@ -60,6 +79,7 @@ class YoutubeCache {
     final viaYtDlp = await _ytDlp(url, say);
     if (viaYtDlp == null) {
       say('yt-dlp: tải xong.');
+      await _remember(url);
       return null;
     }
     say('yt-dlp lỗi: $viaYtDlp');
@@ -67,6 +87,7 @@ class YoutubeCache {
     final viaExplode = await _explode(url, say);
     if (viaExplode == null) {
       say('youtube_explode: tải xong.');
+      await _remember(url);
       return null;
     }
     say('youtube_explode lỗi: $viaExplode');

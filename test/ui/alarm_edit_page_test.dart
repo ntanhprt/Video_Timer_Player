@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:video_timer_player/alarm/music_library.dart';
 import 'package:video_timer_player/core/alarm.dart';
 import 'package:video_timer_player/core/schedule.dart';
 import 'package:video_timer_player/core/volume_curve.dart';
@@ -99,5 +100,57 @@ void main() {
   test('parseLinks splits on lines, spaces and commas', () {
     expect(parseLinks('a\nb c,d\n\na'), ['a', 'b', 'c', 'd']);
     expect(parseLinks('  '), isEmpty);
+  });
+
+  testWidgets('the save button is in the top bar, not at the bottom', (t) async {
+    await _pump(t, _alarm());
+    final bar = find.descendant(of: find.byType(AppBar), matching: find.byKey(const Key('save')));
+    expect(bar, findsOneWidget);
+    expect(t.getTopRight(bar).dx, greaterThan(t.getSize(find.byType(Scaffold)).width * 0.8));
+    expect(find.byType(BottomNavigationBar), findsNothing);
+  });
+
+  testWidgets('saving an edited alarm closes the page without asking about unsaved changes', (t) async {
+    final repo = _FakeRepo();
+    await t.pumpWidget(MaterialApp(
+      home: Builder(
+        builder: (context) => TextButton(
+          onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => AlarmEditPage(repo: repo, initial: _alarm()))),
+          child: const Text('mở'),
+        ),
+      ),
+    ));
+    await t.tap(find.text('mở'));
+    await t.pumpAndSettle();
+    await t.enterText(find.byType(TextField).first, 'Tên mới');
+    await t.pump();
+    expect(find.textContaining('chưa lưu'), findsOneWidget);
+    await t.tap(find.byKey(const Key('save')));
+    await t.pumpAndSettle();
+    expect(find.text('Chưa lưu'), findsNothing);
+    expect(find.byType(AlarmEditPage), findsNothing);
+    expect(find.text('mở'), findsOneWidget);
+    expect(repo.saved.single.name, 'Tên mới');
+  });
+
+  testWidgets('tracks chosen from the shared library join the alarm: links as links, files as files', (t) async {
+    final repo = _FakeRepo();
+    final tracks = <LibraryTrack>[
+      (path: '/a/1.m4a', name: 'Bài YT', url: 'https://youtu.be/dQw4w9WgXcQ', bytes: 1048576, modified: DateTime(2026), youtube: true),
+      (path: '/m/2.mp3', name: 'File', url: null, bytes: 1048576, modified: DateTime(2026), youtube: false),
+    ];
+    await t.pumpWidget(MaterialApp(home: AlarmEditPage(repo: repo, initial: _alarm(), onLibrary: () async => tracks)));
+    await t.ensureVisible(find.byKey(const Key('pickFromLibrary')));
+    await t.tap(find.byKey(const Key('pickFromLibrary')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const Key('lib-/a/1.m4a')));
+    await t.tap(find.byKey(const Key('lib-/m/2.mp3')));
+    await t.pump();
+    await t.tap(find.byKey(const Key('library-add')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const Key('save')));
+    await t.pump();
+    expect(repo.saved.single.youtubeUrls, ['https://youtu.be/dQw4w9WgXcQ']);
+    expect(repo.saved.single.audioFiles, ['/m/2.mp3']);
   });
 }

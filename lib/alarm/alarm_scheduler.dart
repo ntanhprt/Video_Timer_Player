@@ -8,6 +8,7 @@ import '../core/alarm.dart' as model;
 import '../core/schedule.dart';
 import '../data/alarm_repository.dart';
 import 'alarm_health.dart';
+import 'music_library.dart';
 import 'plan.dart';
 import 'youtube_cache.dart';
 
@@ -39,6 +40,20 @@ class AlarmScheduler {
   final health = ValueNotifier<AlarmHealth>(AlarmHealth.ok);
 
   AlarmScheduler(this.repo, this.cache, {DateTime Function()? clock, this.extraAlarms, this.permissionProblems}) : _now = clock ?? DateTime.now;
+
+  /// Every audio file on the phone (downloaded YouTube and picked files), for choosing into any alarm.
+  Future<List<LibraryTrack>> musicLibrary() async {
+    final alarms = await repo.all();
+    final links = {
+      for (final a in alarms) ...a.youtubeUrls,
+      // Staged alarms keep a link per stage.
+      for (final a in alarms)
+        if (a.schedule case Staged s)
+          for (final st in s.stages)
+            if (st.youtubeUrl != null) st.youtubeUrl!,
+    };
+    return MusicLibrary(cache).all(knownUrls: links);
+  }
 
   /// The user has read the "alarms were wiped" notice.
   void dismissWiped() => health.value = health.value.without(AlarmProblem.wiped);

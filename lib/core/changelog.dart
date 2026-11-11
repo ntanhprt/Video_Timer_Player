@@ -4,6 +4,14 @@ typedef ChangelogEntry = ({String version, String date, List<String> changes});
 
 const changelog = <ChangelogEntry>[
   (
+    version: '0.8.4',
+    date: '11/11/2026',
+    changes: [
+      'Nút "Lưu" khi tạo/sửa báo thức nằm ở góc trên bên phải, dễ bấm. Sửa lỗi bấm Lưu xong vẫn hỏi "Chưa lưu, ở lại hay thoát"; "Thoát, bỏ thay đổi" và "Xóa" cũng không còn hỏi lại.',
+      'Nhạc dùng chung cho mọi báo thức: nút "Chọn từ nhạc đã tải / đã có trong máy" liệt kê mọi bài YouTube đã tải và file đã chọn, tích nhiều bài để thêm vào danh sách của báo thức đang sửa.',
+    ],
+  ),
+  (
     version: '0.8.3',
     date: '10/11/2026',
     changes: [
