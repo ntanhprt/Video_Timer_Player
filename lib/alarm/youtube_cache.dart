@@ -18,15 +18,17 @@ class YoutubeCache {
   /// Whether [download] is currently skipping because of a rate limit.
   bool get rateLimited => _blockedUntil?.isAfter(DateTime.now()) ?? false;
 
-  final Future<Directory> Function()? _dir;
+  /// Where to keep the audio instead of the app's own folder (for tests).
+  final Future<Directory> Function()? dir;
 
-  YoutubeCache({Future<Directory> Function()? dir}) : _dir = dir;
+  YoutubeCache({this.dir});
 
   /// Where the downloaded audio lives.
   Future<Directory> audioDirectory() async {
-    final dir = _dir != null ? await _dir() : Directory(p.join((await getApplicationSupportDirectory()).path, 'audio'));
-    await dir.create(recursive: true);
-    return dir;
+    final custom = dir;
+    final d = custom != null ? await custom() : Directory(p.join((await getApplicationSupportDirectory()).path, 'audio'));
+    await d.create(recursive: true);
+    return d;
   }
 
   Future<File> _file(String url) async => File(p.join((await audioDirectory()).path, '${keyOf(url)}.m4a'));
